@@ -19,8 +19,22 @@ export default defineNuxtConfig({
   },
   nitro: {
     // Yalnızca bir sunucu tarafı bağımlılığı: mongoose
+    // (Deno Deploy preset'i denenirken mongodb'in AWS bağımlılıklarının
+    //  paketlenmeye çalışılmasını engelliyoruz)
     externals: {
-      external: ['mongoose']
+      external: [
+        'mongoose',
+        'mongodb',
+        'mongodb-memory-server',
+        '@aws-sdk/credential-providers',
+        '@aws-sdk/credential-provider-node',
+        '@aws-sdk/types',
+        'aws4',
+        'aws-crt',
+        'gcp-metadata',
+        'socks',
+        'tslib'
+      ]
     }
   }
 })

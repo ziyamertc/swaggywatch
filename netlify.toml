@@ -1,0 +1,20 @@
+# Netlify yapılandırması (ücretsiz, kart gerektirmez)
+# Deploy: Netlify Dashboard → Add new site → Import existing project → repo seç
+# Netlify, Nuxt 3'ü otomatik algılar ve NITRO_PRESET=netlify ile build eder.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["**/*.node"]
+
+# Tüm yolları serverless fonksiyona yönlendir
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/server"
+  status = 200

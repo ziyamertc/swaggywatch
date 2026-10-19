@@ -6,6 +6,10 @@
 
 *Kocaman parlak soru • günde 1 oy • yayın açınca otomatik kapanır*
 
+🌐 **Canlı:** https://swgy.swaggywatch.deno.net/
+🎬 **OBS Overlay:** https://swgy.swaggywatch.deno.net/overlay
+🎛️ **Yayıncı Paneli:** https://swgy.swaggywatch.deno.net/admin
+
 ![Ekran görüntüsü](docs/ekran-goruntusu.png)
 
 </div>
@@ -136,6 +140,33 @@ Geri dönüştürülemiyor.
 **Geçmiş veriler silinir mi?**
 Günler geçmiş günler arşivinde kalır (kazanan, dağılım, kapanış sebebi). Yeni gün oyları
 sıfırdan başlar.
+
+---
+
+## 🌍 Canlı Ortam (Deno Deploy)
+
+**🌐 https://swgy.swaggywatch.deno.net/**
+
+| Yol | Ne |
+|---|---|
+| `/` | Ana panel (izleyici) |
+| `/overlay` | OBS ekranı (1920×1080) |
+| `/admin` | Gizli yayıncı paneli (ADMIN_KEY gerekli) |
+
+Deno Deploy **kredi kartı istemiyor**, ücretsiz planı 1M istek/ay + 10 app veriyor ve
+MongoDB bağlantısı Deno içinde sorunsuz çalışıyor (`npm:mongodb` sürücüsü).
+
+### Deploy notları
+
+- **SSE (anlık güncelleme)** için `h3`ün `createEventStream()` kullanılır — runtime'dan bağımsız.
+  Node'un `res.write()` yöntemi Deno Deploy'da **503** döndürüyordu.
+- Sayfanın **ortalanması** için `body { align-items: stretch }` + `#__nuxt { width: 100% }` şart;
+  aksi hâlde `#__nuxt` shrink-to-fit olup içerik sola yapışıyor.
+- Değişiklik sonrası `git push` → Deno Deploy otomatik yeniden deploy eder.
+
+```bash
+npm run live-test https://swgy.swaggywatch.deno.net   # canlı smoke test
+```
 
 ---
 

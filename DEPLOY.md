@@ -2,66 +2,90 @@
 
 Repo: **https://github.com/ziyamertc/swaggywatch** (branch: `main`)
 
+> 💳 **Kart isteyen platformlar:** Northflank, Fly.io, Railway, Google Cloud Run, Oracle Cloud —
+> hepsi önce ödeme yöntemi istiyor. Aşağıdaki iki seçenek **kart gerektirmez**.
+
 ---
 
-## ⭐ Seçenek 1: Northflank Sandbox (ÖNERİLEN)
+## 🥇 Seçenek 1: Render (kart GEREKMEZ — önerilen)
 
-**Neden?** Ücretsiz planda **hiç uyumaz** (always-on) → yayın başlarken site donmaz.
-Kart gerekmez.
+Render'ın Hobby (ücretsiz) planı **kredi kartı istemiyor**. `render.yaml` hazır, 5 dakikada kurulur.
 
 ### Adımlar
 
-1. **Kayıt ol** → https://northflank.com/signup (ücretsiz, kart gerekmez)
-2. **Create Service** → **Dockerfile** seç → **GitHub** → repo: `ziyamertc/swaggywatch`
-   - Dockerfile yolu: `/Dockerfile` (varsayılan, dokunma)
-   - **Port**: `3000`
-   - **Health check path**: `/api/poll/current`
-   - Instance: `nf-compute-10` (ücretsiz kapsam)
-3. **Environment Variables** ekle:
+1. **https://dashboard.render.com/register** → GitHub ile ücretsiz hesap aç
+2. **New → Blueprint** → repo'yu seç (`ziyamertc/swaggywatch`)
+   - `render.yaml` otomatik okunur, servis adı **`swaggybark-panel`** olmalı
+     (keep-alive cron'u bu adrese ping atıyor)
+3. Render **2 şey ister**:
+   - `MONGODB_URI` → `mongodb+srv://<kullanıcı>:<şifre>@cluster0.<cluster>.mongodb.net/?retryWrites=true&w=majority`
+   - `ADMIN_KEY` → kendi belirlediğin anahtar
+   - `VOTE_SECRET` → Render otomatik üretir (`generateValue: true`)
+4. **Apply** → Build → Deploy → `https://swaggybark-panel.onrender.com` 🎉
 
-```
-MONGODB_URI   = mongodb+srv://<kullanici>:<sifre>@cluster0.<cluster>.mongodb.net/?retryWrites=true&w=majority
-MONGODB_DB    = swaggybark
-VOTE_SECRET   = <openssl rand -hex 32  →  64 karakter>
-ADMIN_KEY     = <24+ karakter rastgele>
-KICK_CHANNEL  = swaggybark
-KICK_UA       = swaggybark-panel/1.0
-```
+### Render'ın tek kısıtı
 
-4. **Deploy** → birkaç dakika → `https://<servis-adı>.code.run` hazır 🎉
-5. **Custom domain** eklemek istersen: Service → Domains → kendi domainini ekle (SSL otomatik)
+Ücretsiz servis **15 dakika trafik gelmezse uykuya dalar** (soğuk başlangıç ~1 dk).
+`render.yaml` içindeki **keep-alive cron** 5 dakikada bir ping atarak bunu engeller ✅
 
-### Vite'r iki değeri nasıl üretirsin?
-
-```bash
-openssl rand -hex 32     # VOTE_SECRET
-openssl rand -hex 24     # ADMIN_KEY
-```
-(PowerShell: `[guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")`)
+Ayrıca Render'da **SSE (anlık güncelleme) desteklenir** — açık bağlantı trafik sayılır.
 
 ---
 
-## 🥈 Seçenek 2: Render (Hobby — ücretsiz)
+## 🥈 Seçenek 2: Kendi bilgisayarın + Cloudflare Tunnel (kart GEREKMEZ, hiç uyumaz)
 
-1. Repo zaten GitHub'da ✓
-2. https://dashboard.render.com → **New → Blueprint** → repo'yu seç
-   (`render.yaml` otomatik okunur, `MONGODB_URI` ve `ADMIN_KEY` ister)
-3. Deploy → `https://swaggybark-panel.onrender.com`
+Yayın yaptığın bilgisayar zaten açık → site oradan çalışsın, dışarıya **Cloudflare Tunnel**
+ile açılsın. Ücretsiz Cloudflare hesabı **kart istemiyor**.
 
-> ⚠️ Render ücretsiz planı **15 dk hareketsizlikte uykuya dalar** (soğuk başlangıç ~1 dk).
-> `render.yaml` içindeki **keep-alive cron** 5 dakikada bir ping atarak bunu engeller.
+### Kurulum
+
+```powershell
+winget install --id Cloudflare.cloudflared
+```
+
+### Çalıştırma (PowerShell)
+
+```powershell
+cd "C:\Users\ziqxc\OneDrive\Documents\Varsayılan Proje\swaggybark-panel"
+
+# 1) Sunucuyu başlat
+npm run build
+npm start
+
+# 2) Başka bir terminalde tüneli aç (kart, hesap gerekmez — hızlı tünel)
+cloudflared tunnel --url http://localhost:3000
+```
+
+Çıkan `https://xxx-xxx-xxx.trycloudflare.com` adresi panelin adresi olur.
+
+> ⚠️ **Hızlı tünel** (trycloudflare.com) **SSE desteklemez** ve adres her açılışta değişir.
+> Sabit adres + SSE için **ücretsiz Cloudflare hesabı** ile *named tunnel* kur:
+>
+> ```powershell
+> cloudflared tunnel login
+> cloudflared tunnel create swaggywatch
+> cloudflared tunnel route dns swaggywatch panel.senin-domainin.com
+> ```
+> Sonra `cloudflared tunnel run swaggywatch` ile sabit adresle çalışır, SSE de çalışır.
+
+### Avantaj / dezavantaj
+
+| | |
+|---|---|
+| ✅ | Kart yok, uyku yok, anlık (SSE tam çalışır), hızlı kurulum |
+| ⚠️ | Bilgisayarın açık olmalı (yayın sırasında zaten açık) |
+| ⚠️ | Hızlı tünelde adres her seferinde değişir → OBS'ta güncellemek gerekir |
 
 ---
 
-## 🥉 Seçenek 3: Docker (Cloud Run / Oracle / kendi VPS)
+## 🥉 Seçenek 3: Kart gerektirenler (opsiyonel)
 
-```bash
-git clone https://github.com/ziyamertc/swaggywatch.git
-cd swaggywatch
-cp .env.example .env       # değerleri doldur
-docker build -t swaggybark .
-docker run -d -p 3000:3000 --env-file .env --name swaggybark swaggybark
-```
+| Platform | Notlar |
+|---|---|
+| **Northflank Sandbox** | Ücretsiz ama **kart istiyor**; uyumaz (always-on) |
+| **Google Cloud Run** | Ücretsiz kota, **kart istiyor**, Dockerfile hazır |
+| **Oracle Cloud Always Free** | 2 VM, 24/7, **kart istiyor** |
+| **Docker** | `docker build -t swaggybark .` → herhangi bir sunucuya |
 
 ---
 

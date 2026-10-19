@@ -20,7 +20,7 @@ Kart gerekmez.
 3. **Environment Variables** ekle:
 
 ```
-MONGODB_URI   = mongodb+srv://USER:PASSWORD@cluster0.CLUSTER.mongodb.net/?retryWrites=true&w=majority
+MONGODB_URI   = mongodb+srv://<kullanici>:<sifre>@cluster0.<cluster>.mongodb.net/?retryWrites=true&w=majority
 MONGODB_DB    = swaggybark
 VOTE_SECRET   = <openssl rand -hex 32  →  64 karakter>
 ADMIN_KEY     = <24+ karakter rastgele>

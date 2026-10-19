@@ -3,7 +3,11 @@
  * Test amaçlıdır: gerçek oyları simüle eder ve MongoDB'ye yazar.
  */
 const B = 'http://localhost:3000'
-const ADMIN = process.env.ADMIN_KEY || '71f12dfa0378a17a1c7edaa5'
+const ADMIN = process.env.ADMIN_KEY
+if (!ADMIN) {
+  console.error('❌ ADMIN_KEY tanımlı değil (--env-file=.env ile çalıştır)')
+  process.exit(1)
+}
 
 const post = (path, body, headers = {}) => fetch(B + path, {
   method: 'POST',

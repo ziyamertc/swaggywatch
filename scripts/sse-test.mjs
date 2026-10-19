@@ -3,7 +3,11 @@
  * olayın ne kadar sürede ulaştığını ölçer.
  */
 const B = 'http://localhost:3000'
-const ADMIN = process.env.ADMIN_KEY || '71f12dfa0378a17a1c7edaa5'
+const ADMIN = process.env.ADMIN_KEY
+if (!ADMIN) {
+  console.error('❌ ADMIN_KEY tanımlı değil (--env-file=.env ile çalıştır)')
+  process.exit(1)
+}
 
 const controller = new AbortController()
 const res = await fetch(B + '/api/stream', { signal: controller.signal, headers: { Accept: 'text/event-stream' } })

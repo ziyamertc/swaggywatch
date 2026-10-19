@@ -1,0 +1,30 @@
+{
+  "name": "swaggybark-beklenti-paneli",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "start": "node --env-file=.env .output/server/index.mjs",
+    "postinstall": "nuxt prepare",
+    "db:check": "node --env-file=.env scripts/db-check.mjs",
+    "db:dump": "node --env-file=.env scripts/db-dump.mjs",
+    "db:clean": "node --env-file=.env scripts/db-clean.mjs",
+    "simulate:votes": "node --env-file=.env scripts/simulate-votes.mjs",
+    "test:sse": "node --env-file=.env scripts/sse-test.mjs",
+    "test": "node scripts/day-key.test.mjs && node scripts/state-machine.test.mjs",
+    "test:day": "node scripts/day-key.test.mjs",
+    "test:state": "node scripts/state-machine.test.mjs",
+    "probe:kick": "node scripts/kick-probe.mjs"
+  },
+  "dependencies": {
+    "mongoose": "^8.9.5",
+    "nuxt": "^3.15.4",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5"
+  }
+}

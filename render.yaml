@@ -1,0 +1,36 @@
+# Render Blueprint — render.yaml
+# Dashboard > New > Blueprint → bu dosyayı seç
+services:
+  - type: web
+    name: swaggybark-panel
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci && npm run build
+    startCommand: node .output/server/index.mjs
+    healthCheckPath: /api/poll/current
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: swaggybark
+      - key: VOTE_SECRET
+        generateValue: true
+      - key: ADMIN_KEY
+        generateValue: true
+      - key: KICK_CHANNEL
+        value: swaggybark
+      - key: KICK_UA
+        value: swaggybark-panel/1.0
+
+  # Ücretsiz plan 15 dk hareketsizlikte uykuya dalıyor.
+  # Bu cron her 5 dakikada siteyi ping'leyerek uyanık tutar (soğuk başlangıç olmaz).
+  - type: cron
+    name: keep-alive
+    runtime: node
+    plan: free
+    schedule: "*/5 * * * *"
+    buildCommand: "echo keep-alive"
+    startCommand: "sleep 1 && curl -s -o /dev/null -w '%{http_code}' https://swaggybark-panel.onrender.com/api/poll/current"

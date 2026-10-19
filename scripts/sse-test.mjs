@@ -42,10 +42,13 @@ while (messages.length < 3 && Date.now() - t0 < 15000) {
   const parts = buffer.split('\n\n')
   buffer = parts.pop() || ''
   for (const p of parts) {
-    if (p.startsWith('data: ')) {
-      const d = JSON.parse(p.slice(6))
+    // h3 formatı: "event: message\ndata: {...}"
+    const line = p.split('\n').find(l => l.startsWith('data: '))
+    if (!line) continue
+    try {
+      const d = JSON.parse(line.slice(6))
       messages.push({ ms: Date.now() - t0, ...d })
-    }
+    } catch { /* ping gibi veri olmayan satırlar */ }
   }
 }
 

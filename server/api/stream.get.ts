@@ -1,3 +1,4 @@
+import { createEventStream } from 'h3'
 import { bus, type PollEvent } from '../utils/bus'
 import { getStreamStatus } from '../utils/kick'
 import { syncPollWithStream } from '../utils/poll-state'
@@ -7,20 +8,19 @@ import { dayKeyFor, nextResetIso } from '~/shared/utils/day'
  * GET /api/stream  —  Server-Sent Events (anlık güncelleme)
  *
  * Oyun verildiği anda tüm ekranlara (panel + OBS overlay) bildirilir.
- * Yoklama (30 sn) sadece yedek yol olarak çalışır.
+ * Yoklama (30 sn) sadece yedek yoldur.
+ *
+ * NOT: h3'ün createEventStream() kullanılıyor — runtime'dan bağımsız çalışır.
+ * Node'un (node:http) res.write() yöntemi Deno Deploy'da 503 döndürüyordu;
+ * Web standardı ReadableStream her ikisinde de çalışıyor.
  */
 export default defineEventHandler(async (event) => {
-  setHeader(event, 'Content-Type', 'text/event-stream; charset=utf-8')
-  setHeader(event, 'Cache-Control', 'no-cache, no-transform')
-  setHeader(event, 'Connection', 'keep-alive')
-  setHeader(event, 'X-Accel-Buffering', 'no')
-
-  const res = event.node.res
-  let closed = false
+  const eventStream = createEventStream(event, { autoclose: true })
 
   const send = (data: any) => {
-    if (closed || res.writableEnded) return
-    try { res.write(`data: ${JSON.stringify(data)}\n\n`) } catch { /* bağlantı kapandı */ }
+    try {
+      eventStream.push({ event: 'message', data: JSON.stringify(data) })
+    } catch { /* bağlantı kapandı */ }
   }
 
   // ilk durum
@@ -37,24 +37,23 @@ export default defineEventHandler(async (event) => {
   bus.on('poll', onPoll)
 
   // bağlantı canlılığı (proxy time-out koruması)
+  // 'ping' adlı ayrı bir event: istemcinin onmessage'i tetiklenmez, sadece
+  // bağlantı canlı kalır.
   const ping = setInterval(() => {
-    if (closed || res.writableEnded) return
-    try { res.write(': ping\n\n') } catch { /* yoksay */ }
+    try { eventStream.push({ event: 'ping', data: '' }) } catch { /* yoksay */ }
   }, 20_000)
 
   const cleanup = () => {
-    closed = true
     clearInterval(ping)
     bus.off('poll', onPoll)
   }
 
-  event.node.req.on('close', cleanup)
-  event.node.req.on('error', cleanup)
+  // bağlantı kapandığında temizle (Node + Web standardı)
+  const req = (event.node as any)?.req
+  req?.on?.('close', cleanup)
+  req?.on?.('error', cleanup)
+  const signal = (event as any)?.web?.request?.signal
+  signal?.addEventListener?.('abort', cleanup)
 
-  // h3'ün isteği kapatmasına izin ver
-  await new Promise<void>((resolve) => {
-    event.node.req.on('close', () => resolve())
-    event.node.res.on('close', () => resolve())
-  })
-  cleanup()
+  return eventStream.send()
 })

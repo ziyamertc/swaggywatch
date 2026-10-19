@@ -67,7 +67,14 @@ if (ADMIN) {
       buf += dec.decode(value, { stream: true })
       const parts = buf.split('\n\n')
       buf = parts.pop() || ''
-      for (const p of parts) if (p.startsWith('data: ')) events.push({ ms: Date.now() - t0, ...JSON.parse(p.slice(6)) })
+      for (const p of parts) {
+        const line = p.split('\n').find(l => l.startsWith('data: '))
+        if (!line) continue
+        try {
+          const d = JSON.parse(line.slice(6))
+          events.push({ ms: Date.now() - t0, ...d })
+        } catch { /* ping */ }
+      }
     }
     ctrl.abort()
     await voting

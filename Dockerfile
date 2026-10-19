@@ -15,9 +15,12 @@ RUN npm run build
 FROM node:22-slim
 WORKDIR /app
 ENV NODE_ENV=production
+# NOT: NITRO_PORT bilerek yazılmadı — platform (Northflank/Render/Cloud Run)
+# çalışma anında PORT'u kendi atadığı port ile enjekte eder ve bu değer
+# Dockerfile'daki ENV'yi ezer. NITRO_PORT olsaydı Nitro 3000'de kalır,
+# platform ise farklı bir portu yönlendirirdi → site açılmazdı.
 ENV PORT=3000
 ENV HOST=0.0.0.0
-ENV NITRO_PORT=3000
 
 COPY --from=build /app/.output ./.output
 COPY --from=build /app/public ./public

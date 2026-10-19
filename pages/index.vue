@@ -1,7 +1,7 @@
 <template>
   <div class="layout">
     <!-- SOL REKLAM ALANI -->
-    <aside v-if="slots.left.enabled" class="side-slot" :style="slotStyle(slots.left)">
+    <aside v-if="slots.left.enabled" class="side-slot slot-left" :style="slotStyle(slots.left)">
       <a v-if="slots.left.url" :href="slots.left.link || undefined" target="_blank" rel="noopener nofollow" class="slot-link">
         <img :src="slots.left.url" :alt="slots.left.title" loading="lazy">
       </a>
@@ -216,7 +216,7 @@
     </div>
 
     <!-- SAĞ REKLAM ALANI -->
-    <aside v-if="slots.right.enabled" class="side-slot" :style="slotStyle(slots.right)">
+    <aside v-if="slots.right.enabled" class="side-slot slot-right" :style="slotStyle(slots.right)">
       <a v-if="slots.right.url" :href="slots.right.link || undefined" target="_blank" rel="noopener nofollow" class="slot-link">
         <img :src="slots.right.url" :alt="slots.right.title" loading="lazy">
       </a>

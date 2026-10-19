@@ -17,19 +17,30 @@ body{
     var(--kick-dark);
   color:var(--text);
   min-height:100vh;
-  display:flex;flex-direction:column;align-items:center;
+  display:flex;flex-direction:column;
+  align-items:stretch;          /* #__nuxt tam genişlik almalı, aksi hâlde içerik daralıp sola yapışır */
   padding:32px 16px;
+}
+/* Nuxt'ın kök sarmalayıcısı: tam genişlik + çocukları ortalar */
+#__nuxt{
+  width:100%;min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;
 }
 .wrap{width:100%;max-width:760px;display:flex;flex-direction:column;gap:20px}
 
 /* ---------- Yan reklam alanları ---------- */
 .layout{
-  width:100%;max-width:1400px;margin:0 auto;
+  width:100%;max-width:1440px;margin:0 auto;
   display:grid;
   grid-template-columns:auto minmax(0,760px) auto;
-  gap:22px;
+  justify-content:center;      /* slot'lar kapalıyken de içerik ortada kalsın */
+  gap:20px;
   align-items:start;
 }
+/* Her çocuk açıkça yerleştirilir: slot'lar kapalıyken .wrap 1. kolona düşmesin */
+.layout > .slot-left{grid-column:1}
+.layout > .wrap{grid-column:2}
+.layout > .slot-right{grid-column:3}
 .side-slot{
   position:sticky;top:24px;
   background:#0D120B;border:1px dashed var(--border);
@@ -44,7 +55,8 @@ body{
 }
 .slot-empty small{font-size:9px;opacity:.7}
 @media(max-width:1120px){
-  .layout{grid-template-columns:minmax(0,760px)}
+  .layout{grid-template-columns:minmax(0,760px);justify-content:center}
+  .layout > .wrap{grid-column:1}
   .side-slot{display:none}
 }
 

@@ -1,33 +1,42 @@
 /**
- * MongoDB bağlantı testi — env'deki URI ile bağlanıp ping atar.
- * Kullanım: node scripts/db-check.mjs
+ * Render'daki MONGODB_URI değerini test eder.
+ *
+ * Kullanım:
+ *   node scripts\db-check.mjs "mongodb+srv://..."       (tırnak içinde, kopyala-yapıştır)
+ *
+ * Render'da yapılacak: Environment Variables → MONGODB_URI → düzenle → bu komutla
+ * test et → sonra kaydet. Böylece neden "bad auth" aldığını anında görürsün.
  */
-import mongoose from 'mongoose'
+import { MongoClient } from 'mongodb'
 
-const uri = process.env.MONGODB_URI
+const uri = process.argv[2] || process.env.MONGODB_URI
 if (!uri) {
-  console.error('❌ MONGODB_URI yok (.env dosyasını kontrol et)')
+  console.error('❌ URI verilmedi')
   process.exit(1)
 }
 
-const redacted = uri.replace(/\/\/([^:]+):([^@]+)@/, '//$1:***@')
-console.log('🔗 Bağlanılıyor:', redacted)
+console.log('🔗 Test edilen URI (şifre gizli):')
+console.log('   ' + uri.replace(/\/\/([^:]+):([^@]*)@/, '//$1:***@'))
+console.log('   uzunluk:', uri.length, '| boşluk var mı:', /\s/.test(uri) ? 'EVET ⚠️' : 'yok')
+console.log('   placeholder var mı:', /<[^>]+>/.test(uri) ? 'EVET ⚠️' : 'yok')
 
 try {
-  await mongoose.connect(uri, { serverSelectionTimeoutMS: 10000, dbName: process.env.MONGODB_DB || 'swaggybark' })
-  const admin = mongoose.connection.db.admin()
-  const info = await admin.command({ ping: 1 })
-  const dbs = await admin.listDatabases()
-  console.log('✅ Ping:', JSON.stringify(info))
-  console.log('✅ Bağlantı başarılı — sunucu:', mongoose.connection.host)
-  console.log('📂 Veritabanları:', dbs.databases.map(d => d.name).join(', '))
-  const colls = await mongoose.connection.db.listCollections().toArray()
-  console.log('📁 Koleksiyonlar:', colls.length ? colls.map(c => c.name).join(', ') : '(henüz yok)')
-  await mongoose.disconnect()
+  const client = new MongoClient(uri, { serverSelectionTimeoutMS: 12000 })
+  await client.connect()
+  const db = client.db(process.env.MONGODB_DB || 'swaggybark')
+  const cols = await db.listCollections().toArray()
+  console.log('✅ BAĞLANTI BAŞARILI')
+  console.log('📂 Koleksiyonlar:', cols.map(c => c.name).join(', ') || '(yok)')
+  await client.close()
   process.exit(0)
 } catch (err) {
-  console.error('❌ Bağlantı hatası:', err.message)
-  console.error('   → Şifre doğru mu? (URI içindeki <db_password> kısmını gerçek şifre ile değiştir)')
-  await mongoose.disconnect().catch(() => {})
+  console.error('❌ BAĞLANAMADI:', err?.message || err)
+  if (/bad auth/i.test(err?.message || '')) {
+    console.error('\n💡 "bad auth" = kullanıcı adı/şifre hatalı. Kontrol et:')
+    console.error('   • Atlas → Database Access → "dayico" kullanıcısı var mı?')
+    console.error('   • Şifre "dayico3322" mi? (değiştirdiysen yenisini gir)')
+    console.error('   • URI içinde boşluk/sekme/satır sonu var mı? (kopyala-yapıştır bozulur)')
+    console.error('   • Şifrede özel karakter varsa URL-encode: @→%40  :→%3A  /→%2F  #→%23')
+  }
   process.exit(1)
 }

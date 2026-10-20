@@ -1,7 +1,8 @@
 import { castVote, ensurePoll } from '../../utils/poll-service'
 import { syncPollWithStream } from '../../utils/poll-state'
 import { getStreamStatus } from '../../utils/kick'
-import { ipHash } from '../../utils/hash'
+import { ipHash, getClientIp, getUserAgent } from '../../utils/hash'
+import { logVote } from '../../utils/vote-log'
 import { emitPollEvent } from '../../utils/bus'
 import { dayKeyFor } from '~/shared/utils/day'
 
@@ -36,7 +37,6 @@ export default defineEventHandler(async (event) => {
   })
 
   const { poll, result } = await castVote(todayKey, ipHash(event), choice)
-
   if (!poll) {
     throw createError({ statusCode: 409, statusMessage: 'Oylama kapalı, oy kaydedilmedi' })
   }
@@ -48,6 +48,22 @@ export default defineEventHandler(async (event) => {
         ? 'Yayıncı oylamayı kapattı'
         : 'Bu oylama sona erdi'
     throw createError({ statusCode: 409, statusMessage: reason })
+  }
+
+  // 📋 Admin logu: IP, tarayıcı, saat, oy (sadece admin panelinde görünür)
+  if (result === 'added' || result === 'changed') {
+    try {
+      await logVote({
+        dayKey: todayKey,
+        ip: getClientIp(event),
+        hash: ipHash(event),
+        ua: getUserAgent(event),
+        choice,
+        action: result
+      })
+    } catch (e) {
+      console.warn('[log] yazılamadı:', (e as any)?.message || e)
+    }
   }
 
   // 📡 Anlık güncelleme: tüm ekranlara (panel + overlay) bildir

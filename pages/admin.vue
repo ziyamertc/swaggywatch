@@ -55,6 +55,70 @@
       </section>
 
       <section class="panel">
+        <div class="panel-title">
+          <span>📋 Oylama Logu</span>
+          <span>
+            <button class="ghost btn-sm" @click="loadLog()">🔄 Yenile</button>
+            <button class="ghost btn-sm btn-danger" @click="clearLog()">🗑 Temizle</button>
+          </span>
+        </div>
+
+        <!-- istatistikler -->
+        <div class="log-stats" v-if="logStats">
+          <div class="log-stat"><b>{{ logStats.toplam }}</b><span>toplam kayıt</span></div>
+          <div class="log-stat"><b>{{ logStats.benzersizIp }}</b><span>benzersiz IP</span></div>
+          <div class="log-stat c-yes"><b>{{ logStats.yes }}</b><span>EVET</span></div>
+          <div class="log-stat c-no"><b>{{ logStats.no }}</b><span>HAYIR</span></div>
+          <div class="log-stat">
+            <b>{{ logStats.tarayici[0]?.ad || '—' }}<small v-if="logStats.tarayici[0]">{{ logStats.tarayici[0].adet }}</small></b>
+            <span>en çok tarayıcı</span>
+          </div>
+          <div class="log-stat">
+            <b>{{ logStats.cihaz[0]?.ad || '—' }}<small v-if="logStats.cihaz[0]">{{ logStats.cihaz[0].adet }}</small></b>
+            <span>en çok cihaz</span>
+          </div>
+        </div>
+
+        <!-- filtre -->
+        <div class="log-filter">
+          <button class="ghost btn-sm" :class="{ active: logScope === 'today' }" @click="setLogScope('today')">📅 Bugün</button>
+          <button class="ghost btn-sm" :class="{ active: logScope === 'all' }" @click="setLogScope('all')">🗂️ Tüm günler</button>
+          <span class="log-count" v-if="logEntries.length">{{ logEntries.length }} kayıt</span>
+        </div>
+
+        <div v-if="logMsg" class="vote-note" style="text-align:left" v-html="logMsg"></div>
+
+        <div class="log-table-wrap">
+          <table class="hist-table log-table">
+            <thead>
+              <tr>
+                <th>Saat</th><th>IP</th><th>Tarayıcı</th><th>Sistem</th><th>Cihaz</th><th>Oy</th><th>İşlem</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!logEntries.length">
+                <td colspan="7" class="hist-empty">Henüz log kaydı yok. Oylar geldikçe burada görünecek.</td>
+              </tr>
+              <tr v-for="e in logEntries" :key="e.id">
+                <td class="log-time">{{ formatTime(e.at) }}</td>
+                <td class="log-ip">{{ e.ip }}</td>
+                <td>{{ e.browser }}</td>
+                <td>{{ e.os }}</td>
+                <td>{{ e.device }}</td>
+                <td><b :class="e.choice === 'yes' ? 'c-yes' : 'c-no'">{{ e.choice === 'yes' ? '✅ EVET' : '❌ HAYIR' }}</b></td>
+                <td class="log-action">{{ e.action === 'added' ? 'yeni oy' : 'değiştirdi' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="log-note">
+          ⚠️ IP adresleri kişisel veridir. "Temizle" ile kalıcı olarak silinebilir.
+          Bu bölüm yalnızca <b>ADMIN_KEY</b> erişimi olanlara görünür.
+        </div>
+      </section>
+
+      <section class="panel">
         <div class="panel-title"><span>🖼️ Yan Reklam Alanları</span><span>sol / sağ boşluk</span></div>
 
         <div v-for="s in (['left', 'right'] as const)" :key="s" class="slot-editor">
@@ -125,6 +189,10 @@ const msg = ref('')
 const questionInput = ref('')
 const questionMsg = ref('')
 const slotMsg = ref('')
+const logMsg = ref('')
+const logEntries = ref<any[]>([])
+const logStats = ref<any>(null)
+const logScope = ref<'today' | 'all'>('today')
 const slot = reactive({
   left: { enabled: false, url: '', link: '', title: '', width: 260, radius: 16, opacity: 1 },
   right: { enabled: false, url: '', link: '', title: '', width: 260, radius: 16, opacity: 1 }
@@ -144,6 +212,58 @@ const pollStatusText = computed(() => {
   if (s === 'ended_day') return '📦 GÜN DOLDU'
   return '—'
 })
+
+async function loadLog() {
+  // bugünün anahtarı henüz bilinmiyorsa önce çek
+  if (!todayKey.value) {
+    try {
+      const cur: any = await $fetch('/api/poll/current')
+      todayKey.value = cur.todayKey || ''
+    } catch { /* yoksay */ }
+  }
+  try {
+    const res: any = await $fetch('/api/poll/log', {
+      headers: { 'x-admin-key': keyInput.value.trim() },
+      query: logScope.value === 'today' && todayKey.value ? { day: todayKey.value } : {}
+    })
+    logEntries.value = res.entries || []
+    logStats.value = res.stats || null
+    logMsg.value = ''
+  } catch (err: any) {
+    logMsg.value = `❌ ${err?.data?.statusMessage || 'Log alınamadı'}`
+  }
+}
+
+function setLogScope(scope: 'today' | 'all') {
+  logScope.value = scope
+  loadLog()
+}
+
+async function clearLog() {
+  const msg = logScope.value === 'today'
+    ? 'Bugünün log kayıtları silinecek. Onaylıyor musun?'
+    : 'TÜM log kayıtları (tüm günler) silinecek. Onaylıyor musun?'
+  if (!confirm(msg)) return
+  try {
+    const res: any = await $fetch('/api/poll/log', {
+      method: 'DELETE',
+      headers: { 'x-admin-key': keyInput.value.trim() },
+      query: logScope.value === 'today' ? { day: todayKey.value } : {}
+    })
+    logMsg.value = `✔ ${res.deleted} kayıt silindi`
+    loadLog()
+  } catch (err: any) {
+    logMsg.value = `❌ ${err?.data?.statusMessage || 'Silinemedi'}`
+  }
+}
+
+function formatTime(iso: string) {
+  const d = new Date(iso)
+  return d.toLocaleString('tr-TR', {
+    timeZone: 'Europe/Istanbul',
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+  })
+}
 
 async function saveSlot(side: 'left' | 'right') {
   try {
@@ -175,6 +295,7 @@ async function refresh() {
       Object.assign(slot.right, res.slots.right)
     }
   } catch { /* yok */ }
+  if (authed.value) loadLog()
 }
 
 async function saveQuestion() {  const q = questionInput.value.trim()
@@ -241,6 +362,7 @@ onMounted(() => {
     if (s?.authed) {
       authed.value = true
       refresh()
+      loadLog()
     }
   })
 })
@@ -262,6 +384,35 @@ onMounted(() => {
 .kv>div:last-child{border-bottom:none}
 .kv span{color:var(--muted)}
 .kv b{font-weight:600;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- Log tablosu ---------- */
+.log-stats{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
+  gap:8px;margin-bottom:14px;
+}
+.log-stat{
+  background:#0D120B;border:1px solid var(--border);border-radius:10px;
+  padding:10px 12px;display:flex;flex-direction:column;gap:2px;
+}
+.log-stat b{
+  font-family:'Chakra Petch',sans-serif;font-size:20px;font-weight:700;color:var(--text);
+  display:flex;align-items:baseline;gap:5px;
+}
+.log-stat b small{font-size:11px;color:var(--muted);font-weight:600}
+.log-stat span{font-size:10.5px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
+.log-filter{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.log-filter .ghost.active{border-color:var(--kick-green);color:var(--kick-green);background:rgba(83,252,24,.08)}
+.log-count{font-size:12px;color:var(--muted);margin-left:auto}
+.btn-sm{padding:6px 11px;font-size:12px}
+.log-table-wrap{max-height:420px;overflow-y:auto;border:1px solid var(--border);border-radius:10px}
+.log-table{font-size:12.5px}
+.log-table thead th{position:sticky;top:0;background:#101510;z-index:2}
+.log-table td{padding:7px 10px}
+.log-time{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.log-ip{font-family:ui-monospace,Consolas,monospace;color:#9FD3FF;white-space:nowrap}
+.log-action{color:var(--muted);font-size:11.5px;white-space:nowrap}
+.log-note{margin-top:12px;font-size:11.5px;color:var(--muted);line-height:1.6}
+.log-note b{color:#E8B93C}
 
 /* ---------- Slot editörü ---------- */
 .slot-editor{

@@ -71,6 +71,38 @@ const SettingsSchema = new Schema<SettingsDocument>({
   value: { type: String, required: true }
 })
 
+/**
+ * Oylama logu — admin panelinde görüntülenir.
+ * Ham IP + tarayıcı + saat + oy. Yalnızca ADMIN_KEY ile erişilebilir.
+ * NOT: IP bir kişisel veridir → "Logu temizle" ile silinebilir.
+ */
+export interface VoteLogDocument extends Document {
+  dayKey: string
+  at: Date
+  ip: string
+  hash: string
+  browser: string
+  os: string
+  device: string
+  ua: string
+  choice: 'yes' | 'no'
+  action: 'added' | 'changed'
+}
+
+const VoteLogSchema = new Schema<VoteLogDocument>({
+  dayKey: { type: String, required: true, index: true },
+  at: { type: Date, required: true, default: Date.now, index: true },
+  ip: { type: String, required: true },
+  hash: { type: String, required: true },
+  browser: { type: String, required: true, default: 'Diğer' },
+  os: { type: String, required: true, default: 'Bilinmiyor' },
+  device: { type: String, required: true, default: 'Masaüstü' },
+  ua: { type: String, default: '' },
+  choice: { type: String, required: true, enum: ['yes', 'no'] },
+  action: { type: String, required: true, enum: ['added', 'changed'] }
+})
+VoteLogSchema.index({ dayKey: 1, at: -1 })
+
 const g = globalThis as any
 
 export const mongoConfigured = !!process.env.MONGODB_URI
@@ -103,6 +135,7 @@ export async function getPollModel(): Promise<Model<PollDocument> | null> {
       g.__swaggybark_model = mongoose.model<PollDocument>('Poll', PollSchema)
       g.__swaggybark_snapshotModel = mongoose.model<SnapshotDocument>('Snapshot', SnapshotSchema)
       g.__swaggybark_settingsModel = mongoose.model<SettingsDocument>('Setting', SettingsSchema)
+      g.__swaggybark_voteLogModel = mongoose.model<VoteLogDocument>('VoteLog', VoteLogSchema)
     }
     connFailedAt = 0
     return g.__swaggybark_model
@@ -126,4 +159,9 @@ export async function getSnapshotModel(): Promise<Model<SnapshotDocument> | null
 export async function getSettingsModel(): Promise<Model<SettingsDocument> | null> {
   await getPollModel()
   return g.__swaggybark_settingsModel ?? null
+}
+
+export async function getVoteLogModel(): Promise<Model<VoteLogDocument> | null> {
+  await getPollModel()
+  return g.__swaggybark_voteLogModel ?? null
 }

@@ -143,29 +143,59 @@ sıfırdan başlar.
 
 ---
 
-## 🌍 Canlı Ortam (Deno Deploy)
+## 🌍 Canlı Ortam
+
+### ⚠️ Deno Deploy (denendi — kota sınırı)
 
 **🌐 https://swgy.swaggywatch.deno.net/**
 
-| Yol | Ne |
-|---|---|
-| `/` | Ana panel (izleyici) |
-| `/overlay` | OBS ekranı (1920×1080) |
-| `/admin` | Gizli yayıncı paneli (ADMIN_KEY gerekli) |
+Deno Deploy **kredi kartı istemiyor** ve MongoDB bağlantısı sorunsuz çalışıyor
+(`npm:mongodb` sürücüsü). Ancak ücretsiz planda **aylık 10 saat aktif CPU** ve
+**1M istek** sınırı var. 7/24 açık kalan bir panel (SSE bağlantıları açık
+kaldığı için instance sürekli "uyanık") bu kotayı hızlıca tüketir →
+`503 USAGE_EXCEEDED` ile askıya alınır.
 
-Deno Deploy **kredi kartı istemiyor**, ücretsiz planı 1M istek/ay + 10 app veriyor ve
-MongoDB bağlantısı Deno içinde sorunsuz çalışıyor (`npm:mongodb` sürücüsü).
+Bu yüzden **Deno Deploy kalıcı çözüm değil**; aşağıdaki Render önerilir.
+Deno, kota sıfırlandığında (ay başı) yeniden çalışır.
 
-### Deploy notları
+### ⭐ Render (kartsız, 24/7, önerilen)
 
-- **SSE (anlık güncelleme)** için `h3`ün `createEventStream()` kullanılır — runtime'dan bağımsız.
-  Node'un `res.write()` yöntemi Deno Deploy'da **503** döndürüyordu.
-- Sayfanın **ortalanması** için `body { align-items: stretch }` + `#__nuxt { width: 100% }` şart;
-  aksi hâlde `#__nuxt` shrink-to-fit olup içerik sola yapışıyor.
-- Değişiklik sonrası `git push` → Deno Deploy otomatik yeniden deploy eder.
+Render'ın ücretsiz planı **kredi kartı istemiyor** ve 7/24 çalışır (750 saat/ay).
+`render.yaml` hazır:
+
+1. **https://dashboard.render.com/register** → GitHub ile hesap aç
+2. **New → Blueprint** → `ziyamertc/swaggywatch` → servis adı `swaggybark-panel`
+3. Ortam değişkenleri:
+
+```
+MONGODB_URI   = mongodb+srv://<kullanıcı>:<şifre>@cluster0.<cluster>.mongodb.net/?retryWrites=true&w=majority
+MONGODB_DB    = swaggybark
+VOTE_SECRET   = <64 karakter>
+ADMIN_KEY     = <32 karakter>
+KICK_CHANNEL  = swaggybark
+KICK_UA       = swaggybark-panel/1.0
+```
+
+4. Deploy → `https://swaggybark-panel.onrender.com`
+
+`render.yaml` içindeki **keep-alive cron** 5 dakikada bir ping atarak ücretsiz
+planın uykuya dalmasını engeller. Uzun süreli bağlantılar (SSE) Render'da çalışır.
+
+### 📊 Performans notları (CPU kotası için)
+
+Ücretsiz hostlarda CPU kotası sınırlı olduğu için:
+
+| Ayar | Değer | Neden |
+|---|---|---|
+| Kick durum önbelleği | `KICK_TTL_MS` = 120 sn | Yayın durumu dakikalar içinde değişmez |
+| Stale gün kapatma | 60 sn'de bir | Her istekte `updateMany` yapılmasın |
+| Snapshot kaydı | 45 sn'de bir | Her istekte `findOne` yapılmasın |
+| Ayar önbelleği | 30 sn | Soru + 2 slot her istekte okunmasın |
+| İstemci yoklaması | 60 sn | SSE varken yedek ağ |
+| SSE ping | 45 sn | Proxy timeout'unu aşmadan bağlantıyı canlı tut |
 
 ```bash
-npm run live-test https://swgy.swaggywatch.deno.net   # canlı smoke test
+npm run load-test http://localhost:3000 30   # istek süresi ölçümü
 ```
 
 ---

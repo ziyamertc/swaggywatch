@@ -80,7 +80,14 @@ skor  = 50 + (oran×100 − 50) × (0.45 + 0.55 × hacim)
 Örnek: 7 oyda %71 EVET → skor **63** (*"Topluluk hafif EVET lehinde"*).
 25+ oyda %71 EVET → skor **71** (*"Topluluk EVET lehinde eğilimli"*).
 
-### Soruyu değiştirmek
+### Oyunu değiştirmek
+
+Oyunu verdikten sonra **20 saniye** içinde `✏️ Oyumu Değiştir` butonu görünür.
+Butona basınca **10 saniye** içinde oyunu değiştirmen gerekir (butonlar o süre boyunca açılır).
+Değiştirdikten sonra 20 saniyelik süre yenilenir → **istediğin kadar kez değiştirebilirsin**.
+
+Tüm zamanlama sunucuda tutulur (`/api/poll/me`), bu yüzden sayfa yenilense bile
+kilitlenmezsin.
 
 `/admin` → **"❓ Oylama Sorusu"** → yeni soruyu yaz → **Kaydet**.
 Soru panelde ve OBS ekranında anında değişir.

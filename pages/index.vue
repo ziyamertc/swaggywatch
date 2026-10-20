@@ -163,11 +163,11 @@
 
       <div v-if="voteNote" class="vote-note" v-html="voteNote"></div>
 
-      <!-- Oy değiştirme butonu (1 dakika) -->
-      <div class="change-row" v-if="myChoice && votingOpen">
+      <!-- Oy değiştirme butonu (20 sn basma penceresi) -->
+      <div class="change-row" v-if="myChoice && votingOpen && pressWindowOpen">
         <button class="ghost btn-change" @click="openChangeWindow" :disabled="changeWindowOpen">
-          <template v-if="changeWindowOpen">⏳ Değiştirme penceresi: {{ changeSecondsLeft }} sn</template>
-          <template v-else>✏️ Oyumu Değiştir (1 dk)</template>
+          <template v-if="changeWindowOpen">⏳ Değiştir: {{ changeSecondsLeft }} sn</template>
+          <template v-else>✏️ Oyumu Değiştir ({{ pressSecondsLeft }} sn)</template>
         </button>
       </div>
 
@@ -326,11 +326,21 @@ const store = computed(() => cur.value?.store ?? 'mongo')
 const dbError = computed(() => cur.value?.dbError ?? null)
 const history = computed(() => hist.value?.polls ?? [])
 
-const MyVoteLS = 'swaggybark_oyum_v1'
-/** { day, choice, epoch } — epoch, oylar sıfırlandığında değişir (eski oy geçersizleşir) */
-const myVote = ref<{ day: string; choice: 'yes' | 'no'; epoch?: string } | null>(null)
-/** Değiştirme penceresi bitiş zamanı (ms) */
-const changeUntil = ref(0)
+/**
+ * Oyun durumu artık SUNUCUDAN geliyor (/api/poll/me) — localStorage ile
+ * senkronize olmaya çalışmak kilitlenme yapıyordu.
+ *  me.choice       → EVET / HAYIR (sunucudaki gerçek kayıt)
+ *  me.pressUntil   → "Oyumu Değiştir" butonuna basma süresi (oydan 20 sn sonra)
+ *  me.changeUntil  → değiştirme penceresi (butona basılınca 10 sn)
+ */
+const me = ref<{ choice: 'yes' | 'no'; at: number; changeUntil: number; pressUntil: number } | null>(null)
+
+async function loadMe() {
+  try {
+    const res: any = await $fetch('/api/poll/me')
+    me.value = res?.me ?? null
+  } catch { me.value = null }
+}
 const avatarFailed = ref(false)
 
 const clientDayKey = ref(dayKeyFor())
@@ -359,12 +369,12 @@ function formatNumber(n: number) {
 
 /* ---------------- Periyodik güncelleme (yedek) ---------------- */
 onMounted(() => {
-  try { myVote.value = JSON.parse(localStorage.getItem(MyVoteLS) || 'null') } catch { myVote.value = null }
+  loadMe()
   timers.push(setInterval(() => { refreshCur(); refreshHist() }, 60_000))
   timers.push(setInterval(() => {
     nowTs.value = Date.now()
     const k = dayKeyFor()
-    if (k !== clientDayKey.value) { clientDayKey.value = k; refreshCur(); refreshHist() }
+    if (k !== clientDayKey.value) { clientDayKey.value = k; refreshCur(); refreshHist(); loadMe() }
   }, 1000))
   document.addEventListener('keydown', onKey)
 })
@@ -414,17 +424,15 @@ const yesPct = computed(() => Math.round(yesRatio.value * 100))
 const votingOpen = computed(() =>
   !!poll.value && poll.value.status === 'active' && poll.value.dayKey === clientDayKey.value
 )
-const myChoice = computed(() => {
-  if (!myVote.value || !poll.value) return null
-  if (myVote.value.day !== poll.value.dayKey) return null
-  // oylar sıfırlandıysa (epoch değişti) eski oy kaydı geçersiz → tekrar oy verilebilir
-  if (myVote.value.epoch && poll.value.votesEpoch && myVote.value.epoch !== poll.value.votesEpoch) return null
-  return myVote.value.choice
-})
+const myChoice = computed(() => me.value?.choice ?? null)
 
-// Değiştirme penceresi (60 sn) açık mı?
-const changeWindowOpen = computed(() => changeUntil.value > nowTs.value)
-const changeSecondsLeft = computed(() => Math.max(0, Math.ceil((changeUntil.value - nowTs.value) / 1000)))
+// Değiştirme penceresi (sunucu 10 sn) açık mı?
+const changeWindowOpen = computed(() => (me.value?.changeUntil ?? 0) > nowTs.value)
+const changeSecondsLeft = computed(() => Math.max(0, Math.ceil(((me.value?.changeUntil ?? 0) - nowTs.value) / 1000)))
+
+// "Oyumu Değiştir" butonuna basma süresi (oy verildikten sonra 20 sn)
+const pressWindowOpen = computed(() => (me.value?.pressUntil ?? 0) > nowTs.value)
+const pressSecondsLeft = computed(() => Math.max(0, Math.ceil(((me.value?.pressUntil ?? 0) - nowTs.value) / 1000)))
 
 // Butonlar kilidi: oylama kapalıysa ya da (oy verildi ama değiştirme penceresi yoksa)
 const canVote = computed(() => {
@@ -657,10 +665,8 @@ async function vote(choice: 'yes' | 'no') {
       body: { choice }
     })
     poll.value = res.poll
-    myVote.value = { day: res.poll.dayKey, choice, epoch: res.poll.votesEpoch }
-    localStorage.setItem(MyVoteLS, JSON.stringify(myVote.value))
-    // oy değiştirildiyse pencereyi kapat
-    if (res.result === 'changed') changeUntil.value = 0
+    // oy durumu sunucudan tazele (buton penceresi, değiştirme penceresi)
+    await loadMe()
     addRipple(choice === 'yes' ? btnYesEl.value : btnNoEl.value)
     await refreshCur()
     await refreshHist()
@@ -676,10 +682,11 @@ async function vote(choice: 'yes' | 'no') {
 /** 1 dakikalık oy değiştirme penceresini açar (sunucu tarafında doğrulanır). */
 async function openChangeWindow() {
   try {
-    const res: any = await $fetch('/api/poll/change-window', { method: 'POST' })
-    changeUntil.value = res.until || 0
+    await $fetch('/api/poll/change-window', { method: 'POST' })
+    await loadMe()
   } catch (err: any) {
     console.error('Değiştirme penceresi açılamadı:', err?.data?.statusMessage || err)
+    await loadMe()
   }
 }
 

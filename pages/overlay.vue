@@ -44,11 +44,11 @@
       </aside>
     </div>
 
-    <!-- Oy değiştirme butonu -->
-    <div class="ov-change" v-if="myChoice && votingOpen">
+    <!-- Oy değiştirme butonu (20 sn) -->
+    <div class="ov-change" v-if="myChoice && votingOpen && pressWindowOpen">
       <button class="ov-change-btn" @click="openChangeWindow" :disabled="changeWindowOpen">
         <template v-if="changeWindowOpen">⏳ {{ changeSecondsLeft }} sn</template>
-        <template v-else>✏️ Oyumu Değiştir (1 dk)</template>
+        <template v-else>✏️ Oyumu Değiştir ({{ pressSecondsLeft }} sn)</template>
       </button>
     </div>
 
@@ -100,16 +100,21 @@ const total = computed(() => (poll.value ? poll.value.yes + poll.value.no : 0))
 const yesPct = computed(() => (total.value ? Math.round((poll.value!.yes / total.value) * 100) : 0))
 const votingOpen = computed(() => poll.value?.status === 'active' && poll.value?.dayKey === dayKeyFor())
 
-const myVote = ref<{ day: string; choice: 'yes' | 'no'; epoch?: string } | null>(null)
-const changeUntil = ref(0)
-const myChoice = computed(() => {
-  if (!myVote.value || !poll.value) return null
-  if (myVote.value.day !== poll.value.dayKey) return null
-  if (myVote.value.epoch && poll.value.votesEpoch && myVote.value.epoch !== poll.value.votesEpoch) return null
-  return myVote.value.choice
-})
-const changeWindowOpen = computed(() => changeUntil.value > nowTs.value)
-const changeSecondsLeft = computed(() => Math.max(0, Math.ceil((changeUntil.value - nowTs.value) / 1000)))
+/** Oyun durumu sunucudan (/api/poll/me) — localStorage senkronizasyon sorunlarına yol açıyordu */
+const me = ref<{ choice: 'yes' | 'no'; at: number; changeUntil: number; pressUntil: number } | null>(null)
+
+async function loadMe() {
+  try {
+    const res: any = await $fetch('/api/poll/me')
+    me.value = res?.me ?? null
+  } catch { me.value = null }
+}
+
+const myChoice = computed(() => me.value?.choice ?? null)
+const changeWindowOpen = computed(() => (me.value?.changeUntil ?? 0) > nowTs.value)
+const changeSecondsLeft = computed(() => Math.max(0, Math.ceil(((me.value?.changeUntil ?? 0) - nowTs.value) / 1000)))
+const pressWindowOpen = computed(() => (me.value?.pressUntil ?? 0) > nowTs.value)
+const pressSecondsLeft = computed(() => Math.max(0, Math.ceil(((me.value?.pressUntil ?? 0) - nowTs.value) / 1000)))
 const canVote = computed(() => {
   if (!votingOpen.value) return false
   if (!myChoice.value) return true
@@ -143,7 +148,7 @@ const statusNote = computed(() => {
 })
 
 onMounted(() => {
-  try { myVote.value = JSON.parse(localStorage.getItem('swaggybark_oyum_v1') || 'null') } catch { myVote.value = null }
+  loadMe()
   const t = setInterval(() => refresh(), 60_000)
   const tick = setInterval(() => { nowTs.value = Date.now() }, 1000)
   onBeforeUnmount(() => { clearInterval(t); clearInterval(tick) })
@@ -185,9 +190,7 @@ async function vote(choice: 'yes' | 'no') {
   try {
     const res: any = await $fetch('/api/poll/vote', { method: 'POST', body: { choice } })
     if (res?.poll) {
-      myVote.value = { day: res.poll.dayKey, choice, epoch: res.poll.votesEpoch }
-      localStorage.setItem('swaggybark_oyum_v1', JSON.stringify(myVote.value))
-      if (res.result === 'changed') changeUntil.value = 0
+      await loadMe()
     }
     await refresh()
   } catch { /* oy alınamadı */ }
@@ -195,8 +198,8 @@ async function vote(choice: 'yes' | 'no') {
 
 async function openChangeWindow() {
   try {
-    const res: any = await $fetch('/api/poll/change-window', { method: 'POST' })
-    changeUntil.value = res.until || 0
+    await $fetch('/api/poll/change-window', { method: 'POST' })
+    await loadMe()
   } catch { /* pencere açılamadı */ }
 }
 </script>

@@ -54,7 +54,7 @@ export default defineEventHandler(async (event) => {
   if (result === 'locked') {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Oyunu değiştirmek için önce "✏️ Oyumu Değiştir" butonuna bas (1 dakika süreli)'
+      statusMessage: 'Oyunu değiştirmek için önce "✏️ Oyumu Değiştir" butonuna bas (10 saniye içinde değiştir)'
     })
   }
 

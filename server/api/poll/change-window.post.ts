@@ -5,12 +5,12 @@ import { dayKeyFor } from '~/shared/utils/day'
 /**
  * POST /api/poll/change-window
  *
- * Oy veren kullanıcı için 60 saniyelik "oyumu değiştirebilirim" penceresi açar.
+ * Oy veren kullanıcı için 10 saniyelik "oyumu değiştirebilirim" penceresi açar.
  * Pencere açılmadan oy değiştirme isteği reddedilir (409).
  */
 export default defineEventHandler(async (event) => {
   const todayKey = dayKeyFor()
-  const { until, poll } = await openChangeWindow(todayKey, ipHash(event), 60)
+  const { until, poll } = await openChangeWindow(todayKey, ipHash(event), 10)
 
   if (!until) {
     throw createError({

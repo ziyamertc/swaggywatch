@@ -241,6 +241,34 @@ export async function reopenPoll(dayKey: string): Promise<PollDTO> {
   return toDTO(cur!)
 }
 
+/**
+ * Bu kullanıcının (IP hash'i) oy durumu — "ben oy verdim mi, ne zaman,
+ * değiştirme pencerem var mı" bilgisi. Tüm zamanlama sunucuda tutulur,
+ * böylece istemci ile sunucu asla senkronize olmaz.
+ */
+export interface MyVoteInfo {
+  choice: 'yes' | 'no'
+  at: number          // oyun verildiği an
+  changeUntil: number // değiştirme penceresinin bitişi (0 = kapalı)
+  pressUntil: number  // "Oyumu Değiştir" butonuna basma süresi (at + 20 sn)
+}
+
+export const PRESS_WINDOW_MS = 20_000
+
+export async function getMyVote(dayKey: string, hash: string): Promise<MyVoteInfo | null> {
+  const raw = await getPollRaw(dayKey)
+  if (!raw) return null
+  const v = (raw as any).votes?.find((x: any) => x.h === hash)
+  if (!v) return null
+  const at = v.at ? new Date(v.at).getTime() : Date.now()
+  return {
+    choice: v.c,
+    at,
+    changeUntil: v.changeUntil ? new Date(v.changeUntil).getTime() : 0,
+    pressUntil: at + PRESS_WINDOW_MS
+  }
+}
+
 /** Gün döngüsü: dünkü günler arşive düşer (ended_day). En fazla 60 sn'de bir çalışır. */
 export async function closeStalePolls(todayKey: string): Promise<void> {
   const now = Date.now()
@@ -309,13 +337,14 @@ export async function listEndedPolls(limit = 60): Promise<PollDTO[]> {
 }
 
 /**
- * Oy değiştirme penceresini açar (60 saniye).
- * Oyunu değiştirmek için önce bu çağrılmalı — sunucu tarafında kontrol edilir.
+ * Oy değiştirme penceresini açar.
+ * Pencerenin süresi 10 saniyedir: butona basıldıktan sonra oy bu süre içinde
+ * değiştirilmelidir, aksi hâlde değiştirme reddedilir.
  */
 export async function openChangeWindow(
   dayKey: string,
   hash: string,
-  seconds = 60
+  seconds = 10
 ): Promise<{ until: number; poll: PollDTO | null }> {
   const raw = await getPollRaw(dayKey)
   if (!raw) return { until: 0, poll: null }

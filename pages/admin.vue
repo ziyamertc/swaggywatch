@@ -110,6 +110,20 @@
         </div>
       </AdminSection>
 
+      <!-- OYLARI YÖNET -->
+      <AdminSection title="🧹 Oyları Yönet" :sub="`bugün ${poll?.yes ?? 0} EVET / ${poll?.no ?? 0} HAYIR`" :open="sec.oylar" @update:open="v => sec.oylar = v">
+        <div class="admin-row">
+          <button class="ghost btn-warn" @click="clearVotes('today')">🧹 Bugünün oylarını sıfırla</button>
+          <button class="ghost btn-danger" @click="clearVotes('all')">💥 Tüm oyları sil</button>
+        </div>
+        <div class="log-note" style="margin-top:10px">
+          <b>Bugünün oylarını sıfırla</b> → sayaçları 0'a alır, oy kayıtlarını ve trend
+          noktalarını siler; gün satırı arşivde kalır.<br>
+          <b>Tüm oyları sil</b> → bütün günlerin oyları, log ve trend kalıcı olarak yok edilir.
+        </div>
+        <div v-if="votesMsg" class="vote-note" style="text-align:left" v-html="votesMsg"></div>
+      </AdminSection>
+
       <!-- YAN REKLAM ALANLARI -->
       <AdminSection title="🖼️ Yan Reklam Alanları" sub="sol / sağ boşluk" :open="sec.reklam" @update:open="v => sec.reklam = v">
         <div v-for="s in (['left', 'right'] as const)" :key="s" class="slot-editor">
@@ -184,10 +198,11 @@ const logMsg = ref('')
 const logEntries = ref<any[]>([])
 const logStats = ref<any>(null)
 const logScope = ref<'today' | 'all'>('today')
+const votesMsg = ref('')
 const avatar = ref<string | null>(null)
 
 /* Bölümlerin açık/kapalı durumu */
-const sec = reactive({ durum: true, soru: true, log: false, reklam: false, yayin: false })
+const sec = reactive({ durum: true, soru: true, log: false, oylar: false, reklam: false, yayin: false })
 const allOpen = ref(false)
 watch(allOpen, (v) => {
   Object.keys(sec).forEach((k) => { (sec as any)[k] = v })
@@ -256,6 +271,26 @@ async function clearLog() {
     loadLog()
   } catch (err: any) {
     logMsg.value = `❌ ${err?.data?.statusMessage || 'Silinemedi'}`
+  }
+}
+
+async function clearVotes(scope: 'today' | 'all') {
+  const soru = scope === 'today'
+    ? 'Bugünün oyları sıfırlanacak (sayaçlar 0 olur, log ve trend silinir). Onaylıyor musun?'
+    : 'TÜM oylar kalıcı olarak silinecek (bütün günler, log ve trend). Bu işlem geri alınamaz. Onaylıyor musun?'
+  if (!confirm(soru)) return
+  try {
+    const res: any = await $fetch('/api/poll/votes/clear', {
+      method: 'POST',
+      headers: { 'x-admin-key': keyInput.value.trim() },
+      body: { scope }
+    })
+    votesMsg.value = `✔ ${scope === 'today' ? 'Bugünün oyları sıfırlandı' : 'Tüm oylar silindi'} — ` +
+      `poll: ${res.polls}, log: ${res.logs}, trend: ${res.snapshots}`
+    refresh()
+    loadLog()
+  } catch (err: any) {
+    votesMsg.value = `❌ ${err?.data?.statusMessage || 'Silinemedi'}`
   }
 }
 

@@ -1,5 +1,6 @@
 import type { PollDocument, PollStatus } from './db.ts'
-import { getPollModel, mongoConfigured, getSnapshotModel } from './db.ts'
+import { getPollModel, mongoConfigured, getSnapshotModel, getVoteLogModel } from './db.ts'
+import { clearVoteLog } from './vote-log.ts'
 
 /* Uç taşıma için hafif veri şekli (tarihler ISO string) */
 export interface PollDTO {
@@ -280,6 +281,72 @@ export async function listEndedPolls(limit = 60): Promise<PollDTO[]> {
     .limit(limit)
     .lean<PollDocument[]>()
   return docs.map(toDTO)
+}
+
+/**
+ * Oyları sil / sıfırla.
+ *  scope='today' → bugünün oyları, oy kayıtları ve trend noktaları temizlenir
+ *                 (gün satırı kalır, arşiv bozulmaz)
+ *  scope='all'   → tüm günlerin oyları + log + trend tamamen silinir
+ */
+export async function clearVotes(
+  scope: 'today' | 'all',
+  todayKey: string
+): Promise<{ polls: number; logs: number; snapshots: number }> {
+  const Model = await getPollModel()
+  const LogModel = await getVoteLogModel()
+  const SnapModel = await getSnapshotModel()
+  let polls = 0, logs = 0, snapshots = 0
+
+  if (scope === 'today') {
+    if (Model) {
+      const r = await Model.updateOne(
+        { dayKey: todayKey },
+        { $set: { yes: 0, no: 0, votes: [], reopenedAt: new Date() } }
+      )
+      polls = r.modifiedCount || 0
+    } else {
+      const p = mem.polls.get(todayKey)
+      if (p) { p.yes = 0; p.no = 0; p.votes = []; polls = 1 }
+    }
+    if (LogModel) {
+      const r = await LogModel.deleteMany({ dayKey: todayKey })
+      logs = r.deletedCount || 0
+    } else {
+      logs = await clearVoteLog(todayKey)
+    }
+    if (SnapModel) {
+      const r = await SnapModel.deleteMany({ dayKey: todayKey })
+      snapshots = r.deletedCount || 0
+    } else {
+      const before = snapMem.items.length
+      snapMem.items = snapMem.items.filter(i => i.dayKey !== todayKey)
+      snapshots = before - snapMem.items.length
+    }
+  } else {
+    if (Model) {
+      const r = await Model.deleteMany({})
+      polls = r.deletedCount || 0
+    } else {
+      polls = mem.polls.size
+      mem.polls.clear()
+    }
+    if (LogModel) {
+      const r = await LogModel.deleteMany({})
+      logs = r.deletedCount || 0
+    } else {
+      logs = await clearVoteLog(null)
+    }
+    if (SnapModel) {
+      const r = await SnapModel.deleteMany({})
+      snapshots = r.deletedCount || 0
+    } else {
+      snapshots = snapMem.items.length
+      snapMem.items = []
+    }
+  }
+
+  return { polls, logs, snapshots }
 }
 
 /* ---------------- Gün içi trend (beklenti eğrisi) ---------------- */

@@ -55,33 +55,36 @@
           <div class="gauge-label">
             <b>{{ verdict }}</b>
             <span class="sep">•</span>
-            Güven: <b>{{ confidenceText }}</b>
+            Güven: <b>{{ confidenceWord }}</b>
           </div>
         </div>
 
-        <!-- Topluluk skoru + detaylar -->
+        <!-- Topluluk durumu: güven + oy hızı -->
         <div class="score-block">
-          <div class="score-head">
-            <div class="score-value" :class="scoreClass">{{ score }}</div>
-            <div class="score-head-text">
-              <div class="score-label">TOPLULUK SKORU</div>
-              <div class="score-tag">{{ scoreTag }}</div>
+          <div class="signal-row">
+            <div class="signal">
+              <span class="signal-icon">🛡️</span>
+              <div>
+                <b>{{ confidenceWord }}</b>
+                <small>topluluk güveni</small>
+              </div>
+            </div>
+            <div class="signal">
+              <span class="signal-icon">⚡</span>
+              <div>
+                <b>{{ recentVotes }} oy</b>
+                <small>son 10 dakikada</small>
+              </div>
+            </div>
+            <div class="signal">
+              <span class="signal-icon">👥</span>
+              <div>
+                <b>{{ total }} kişi</b>
+                <small>oy kullandı</small>
+              </div>
             </div>
           </div>
-          <div class="score-side">
-            <div class="score-kv">
-              <span>Evet lehine</span>
-              <b class="c-yes">{{ total ? yesPct + '%' : '—' }}</b>
-            </div>
-            <div class="score-kv">
-              <span>Hayır lehine</span>
-              <b class="c-no">{{ total ? (100 - yesPct) + '%' : '—' }}</b>
-            </div>
-            <div class="score-kv">
-              <span>Katılımcı</span>
-              <b>{{ total }} kişi</b>
-            </div>
-          </div>
+          <div class="signal-note">{{ scoreTag }}</div>
         </div>
       </div>
 
@@ -497,42 +500,44 @@ useHead({
   })
 })
 
-/* ---------------- Topluluk Skoru ----------------
-   Oran + veri hacmi birleşik: az oyda 50'ye (kararsız) çekilir, çok oyda netleşir.
-   Skor asla oranla çelişmez — sadece eminlik düzeyini yansıtır. */
-const score = computed(() => {
+/* ---------------- Topluluk sinyalleri ---------------- */
+
+/** Oy sayısına göre güven kelimesi (sayı yerine anlaşılır ifade) */
+const confidenceWord = computed(() => {
   const n = total.value
-  if (!n) return 50
-  const p = yesRatio.value * 100          // 0-100 arası ham oran
-  const volume = Math.min(1, n / 25)      // 25 oyda tam hacim
-  return Math.round(50 + (p - 50) * (0.45 + 0.55 * volume))
+  if (!n) return '—'
+  if (n >= 20) return 'Yüksek'
+  if (n >= 8) return 'Orta'
+  if (n >= 3) return 'Düşük'
+  return 'Çok düşük'
 })
 
+/** Son 10 dakikada kaç oy geldi (trend noktalarından) */
+const recentVotes = computed(() => {
+  const trend = cur.value?.trend ?? []
+  if (!trend.length) return 0
+  const now = Date.now()
+  const window = 10 * 60 * 1000
+  const inWindow = trend.filter((t: any) => now - new Date(t.at).getTime() <= window)
+  if (!inWindow.length) return 0
+  // penceredeki en eski noktanın oy sayısını toplamdan çıkar
+  const oldest = inWindow[0]
+  return Math.max(0, total.value - (oldest.yes + oldest.no))
+})
+
+/** Tek cümlelik yorum */
 const scoreTag = computed(() => {
-  const s = score.value
-  if (!total.value) return 'Henüz oy yok — topluluk sessiz'
-  if (s >= 80) return 'Topluluk EVET konusunda çok net'
-  if (s >= 65) return 'Topluluk EVET lehinde eğilimli'
-  if (s > 55) return 'Topluluk hafif EVET lehinde'
-  if (s === 50) return 'Topluluk tam bölünmüş (50/50)'
-  if (s >= 45) return 'Topluluk hafif HAYIR lehinde'
-  if (s >= 35) return 'Topluluk HAYIR lehinde eğilimli'
-  return 'Topluluk HAYIR konusunda çok net'
-})
-
-const scoreClass = computed(() => {
-  const s = score.value
-  if (!total.value) return 'score-neutral'
-  if (s > 55) return 'score-yes'
-  if (s < 45) return 'score-no'
-  return 'score-neutral'
-})
-
-const confidenceClass = computed(() => {
   const n = total.value
-  if (n >= 20) return 'c-strong'
-  if (n >= 8) return 'c-mid'
-  return 'c-weak'
+  if (!n) return 'Henüz oy yok — topluluk bekliyor.'
+  const p = yesPct.value
+  const side = p >= 50 ? 'EVET' : 'HAYIR'
+  if (n < 5) return `${side} lehinde ama veri az — kesin sonuç için biraz daha oy gerek.`
+  if (recentVotes.value >= 5) return `${side} lehinde ${p}% — topluluk şu an aktif, son dakikalarda oy artıyor.`
+  if (p >= 70) return `Topluluk net şekilde ${side} lehinde (${p}%).`
+  if (p >= 55) return `Topluluk ${side} lehinde eğilimli (${p}%).`
+  if (p >= 45) return `Topluluk ikiye bölünmüş (${p}% / ${100 - p}%).`
+  if (p >= 30) return `Topluluk ${side} lehinde hafif eğilimli (${p}%).`
+  return `Topluluk net şekilde ${side} lehinde (${p}%).`
 })
 
 /* ---------------- Gün içi trend ---------------- */
@@ -626,15 +631,6 @@ const streakSub = computed(() => {
   const s = streak.value
   if (!s.count) return 'ilk oyularla seri başlar'
   return s.count >= 3 ? 'topluluk tutarlı bir yönde 🔥' : 'devam ederse seri büyür'
-})
-
-const confidenceText = computed(() => {
-  const n = total.value
-  if (!n) return '—'
-  if (n < 5) return `çok düşük (${n} oy)`
-  const p = yesRatio.value
-  const d = 1.96 * Math.sqrt(p * (1 - p) / n)
-  return `±${(d * 100).toFixed(0)}%`
 })
 
 function fmtDuration(ms: number) {

@@ -188,33 +188,23 @@ body{
   flex:0 0 auto;width:100%;max-width:340px;
 }
 .hero-grid .gauge-label{margin-top:2px}
-.score-block{flex:1;min-width:250px;display:flex;flex-direction:column;gap:14px}
-.score-head{display:flex;align-items:center;gap:16px}
-.score-head-text{min-width:0}
-.score-value{
-  font-family:'Chakra Petch',sans-serif;
-  font-size:58px;font-weight:700;line-height:1;
-  letter-spacing:-1px;flex:0 0 auto;
+/* ---------- Topluluk sinyalleri ---------- */
+.score-block{flex:1;min-width:260px;display:flex;flex-direction:column;gap:10px}
+.signal-row{display:flex;gap:10px;flex-wrap:wrap}
+.signal{
+  flex:1;min-width:120px;display:flex;align-items:center;gap:10px;
+  background:#0D120B;border:1px solid var(--border);border-radius:12px;padding:11px 13px;
 }
-.score-yes{color:var(--kick-green);text-shadow:0 0 30px rgba(83,252,24,.32)}
-.score-no{color:var(--no-red);text-shadow:0 0 30px rgba(255,59,92,.28)}
-.score-neutral{color:var(--muted)}
-.score-label{
-  font-family:'Chakra Petch',sans-serif;
-  font-size:10px;letter-spacing:2.2px;color:var(--muted);margin-bottom:5px;
+.signal-icon{font-size:17px;line-height:1}
+.signal b{
+  display:block;font-family:'Chakra Petch',sans-serif;font-size:16px;font-weight:700;
+  color:var(--text);line-height:1.15;
 }
-.score-tag{font-size:13px;color:var(--text);font-weight:500;line-height:1.35}
-.score-side{display:flex;flex-direction:column;gap:2px}
-.score-kv{
-  display:flex;justify-content:space-between;gap:12px;
-  font-size:13px;padding:7px 0;border-bottom:1px solid #1A2114;
+.signal small{display:block;font-size:10.5px;color:var(--muted);letter-spacing:.4px;margin-top:2px}
+.signal-note{
+  font-size:12.5px;color:var(--muted);line-height:1.5;
+  border-left:2px solid var(--border);padding-left:10px;
 }
-.score-kv:last-child{border-bottom:none}
-.score-kv span{color:var(--muted)}
-.score-kv b{font-weight:600}
-.c-yes{color:var(--kick-green)}
-.c-no{color:var(--no-red)}
-.c-strong{color:var(--kick-green)}
 .c-mid{color:#E8B93C}
 .c-weak{color:#FF8AA3}
 
@@ -406,6 +396,5 @@ footer b{color:var(--kick-green)}
   .logo-slot{width:56px;height:56px}
   .hero-grid{gap:16px}
   .hero-grid .gauge-area{max-width:100%;margin:0 auto}
-  .score-value{font-size:46px}
-  .score-head{gap:12px}
+  .score-block{min-width:100%}
 }

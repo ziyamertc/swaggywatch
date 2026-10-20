@@ -38,10 +38,11 @@ export default defineEventHandler(async (event) => {
 
   // bağlantı canlılığı (proxy time-out koruması)
   // 'ping' adlı ayrı bir event: istemcinin onmessage'i tetiklenmez, sadece
-  // bağlantı canlı kalır.
+  // bağlantı canlı kalır. Aralık 45 sn: proxy'lerin 60 sn'lik okuma timeout'ına
+  // takılmaz, ama instance'ı sürekli uyandırmaz.
   const ping = setInterval(() => {
     try { eventStream.push({ event: 'ping', data: '' }) } catch { /* yoksay */ }
-  }, 20_000)
+  }, 45_000)
 
   const cleanup = () => {
     clearInterval(ping)

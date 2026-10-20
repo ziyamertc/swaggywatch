@@ -7,20 +7,40 @@ const g = globalThis as any
 if (!g.__swaggybark_settingsMem) g.__swaggybark_settingsMem = { map: new Map<string, string>() }
 const mem = g.__swaggybark_settingsMem as { map: Map<string, string> }
 
+/**
+ * Ayar önbelleği — her istekte 3 Mongo okuması yapılmasın diye.
+ * 30 sn yeterli: soru/reklam değişiklikleri zaten anında görünmesi gereken
+ * şeyler, admin panelinden kaydedildikten sonra bu süre içinde yayına girer.
+ */
+if (!g.__swaggybark_settingsCache) g.__swaggybark_settingsCache = new Map<string, { value: string; at: number }>()
+const cache = g.__swaggybark_settingsCache as Map<string, { value: string; at: number }>
+const SETTINGS_TTL = 30_000
+
 /** Ayarları oku (yoksa varsayılan). */
 export async function getSetting(key: string, fallback: string): Promise<string> {
+  const now = Date.now()
+  const hit = cache.get(key)
+  if (hit && now - hit.at < SETTINGS_TTL) return hit.value
+
   const Model = await getSettingsModel()
-  if (!Model) return mem.map.get(key) ?? fallback
-  try {
-    const doc = await Model.findOne({ key }).lean<SettingsDocument>()
-    return doc?.value ?? fallback
-  } catch {
-    return fallback
+  let value: string
+  if (!Model) {
+    value = mem.map.get(key) ?? fallback
+  } else {
+    try {
+      const doc = await Model.findOne({ key }).lean<SettingsDocument>()
+      value = doc?.value ?? fallback
+    } catch {
+      value = fallback
+    }
   }
+  cache.set(key, { value, at: now })
+  return value
 }
 
-/** Ayarı yaz. */
+/** Ayarı yaz (önbellek de düşer). */
 export async function setSetting(key: string, value: string): Promise<void> {
+  cache.set(key, { value, at: Date.now() })
   const Model = await getSettingsModel()
   if (!Model) {
     mem.map.set(key, value)

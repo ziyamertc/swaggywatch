@@ -114,7 +114,7 @@ const statusNote = computed(() => {
 
 onMounted(() => {
   try { myVote.value = JSON.parse(localStorage.getItem('swaggybark_oyum_v1') || 'null') } catch { myVote.value = null }
-  const t = setInterval(() => refresh(), 10000)
+  const t = setInterval(() => refresh(), 60_000)
   onBeforeUnmount(() => clearInterval(t))
   if (cur.value?.channel?.avatar) avatar.value = cur.value.channel.avatar
 })

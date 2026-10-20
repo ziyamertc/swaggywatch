@@ -339,7 +339,7 @@ function formatNumber(n: number) {
 /* ---------------- Periyodik güncelleme (yedek) ---------------- */
 onMounted(() => {
   try { myVote.value = JSON.parse(localStorage.getItem(MyVoteLS) || 'null') } catch { myVote.value = null }
-  timers.push(setInterval(() => { refreshCur(); refreshHist() }, 30_000))
+  timers.push(setInterval(() => { refreshCur(); refreshHist() }, 60_000))
   timers.push(setInterval(() => {
     nowTs.value = Date.now()
     const k = dayKeyFor()

@@ -10,7 +10,9 @@
  */
 const CHANNEL = process.env.KICK_CHANNEL || 'swaggybark'
 const UA = process.env.KICK_UA || 'swaggybark-panel/1.0'
-const TTL = 30_000
+// Önbellek süresi: yayın durumu dakikalar içinde değişmez.
+// Uzun tutmak hem Kick'e yük bindirir hem de ücretsiz hostların CPU kotasını yiyor.
+const TTL = Number(process.env.KICK_TTL_MS || 120_000)
 
 export interface StreamStatus {
   live: boolean

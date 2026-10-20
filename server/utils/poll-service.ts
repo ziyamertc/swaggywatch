@@ -50,6 +50,19 @@ if (!g.__swaggybark_mem) {
 }
 const mem = g.__swaggybark_mem as { polls: Map<string, MemPoll> }
 
+/* ---------------- Performans: gereksiz DB sorgularını kıs ----------------
+   Ücretsiz hostlarda (Deno/Netlify) CPU kotası var. Her istekte 2-3 MongoDB
+   sorgusu yapmak kotaları hızlıca tüketiyordu. Aşağıdaki throttle'lar aynı
+   davranışı korur ama sorguları seyreltir. */
+
+/** closeStalePolls en fazla bu aralıkla çalışır. */
+if (!g.__swaggybark_staleAt) g.__swaggybark_staleAt = { value: 0 }
+const staleState = g.__swaggybark_staleAt as { value: number }
+
+/** recordSnapshot için son kontrol zamanı (bellek içi). */
+if (!g.__swaggybark_snapAt) g.__swaggybark_snapAt = { value: 0 }
+const snapState = g.__swaggybark_snapAt as { value: number }
+
 /* ---------------- Ortak işlemler ---------------- */
 
 export async function ensurePoll(dayKey: string): Promise<PollDTO> {
@@ -202,22 +215,25 @@ export async function reopenPoll(dayKey: string): Promise<PollDTO> {
   return toDTO(cur!)
 }
 
-/** Gün döngüsü: dünkü günler arşive düşer (ended_day). */
+/** Gün döngüsü: dünkü günler arşive düşer (ended_day). En fazla 60 sn'de bir çalışır. */
 export async function closeStalePolls(todayKey: string): Promise<void> {
-  const now = new Date()
+  const now = Date.now()
+  if (now - staleState.value < 60_000) return
+  staleState.value = now
+
   const Model = await getPollModel()
   if (!Model) {
     for (const p of mem.polls.values()) {
       if (p.dayKey < todayKey && p.status !== 'ended_day') {
         p.status = 'ended_day'
-        p.endedAt = now.toISOString()
+        p.endedAt = new Date().toISOString()
       }
     }
     return
   }
   await Model.updateMany(
     { dayKey: { $lt: todayKey }, status: { $ne: 'ended_day' } },
-    { $set: { status: 'ended_day', endedAt: now } }
+    { $set: { status: 'ended_day', endedAt: new Date() } }
   )
 }
 
@@ -302,6 +318,10 @@ export async function recordSnapshot(dayKey: string, yes: number, no: number): P
     snapMem.items.push({ dayKey, at: now, yes, no })
     return
   }
+
+  // Bellekte son kontrol zamanını tutuyoruz → her istekte findOne yapmayalım
+  if (now - snapState.value < 45_000) return
+  snapState.value = now
 
   const last = await Model.findOne({ dayKey }).sort({ at: -1 }).lean<any>()
   if (last) {

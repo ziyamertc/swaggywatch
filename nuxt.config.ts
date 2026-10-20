@@ -18,6 +18,15 @@ export default defineNuxtConfig({
     }
   },
   nitro: {
+    // Ücretsiz planlarda (Render) instance'ın uykuya dalmasını engellemek için
+    // kendi kendine periyodik istek atan görev. Dışarıdan cron servisi kurmaya
+    // gerek yok (Render cron job'ları aylık en az $1 + kart istiyor).
+    experimental: {
+      tasks: true
+    },
+    scheduledTasks: {
+      '*/5 * * * *': ['poll:keepalive']
+    },
     // Yalnızca bir sunucu tarafı bağımlılığı: mongoose
     // (Deno Deploy preset'i denenirken mongodb'in AWS bağımlılıklarının
     //  paketlenmeye çalışılmasını engelliyoruz)

@@ -1,5 +1,9 @@
 # Render Blueprint — render.yaml
 # Dashboard > New > Blueprint → bu dosyayı seç
+#
+# NOT: Render'da ayrı bir "Cron Job" servisi KURULMAZ — cron job'ları aylık en az
+# $1 tutuyor ve kredi kartı istiyor. Instance'ı uyanık tutma işini uygulamanın
+# kendi içindeki Nitro görevi yapıyor (poll:keepalive, 5 dakikada bir self-ping).
 services:
   - type: web
     name: swaggybark-panel
@@ -24,13 +28,3 @@ services:
         value: swaggybark
       - key: KICK_UA
         value: swaggybark-panel/1.0
-
-  # Ücretsiz plan 15 dk hareketsizlikte uykuya dalıyor.
-  # Bu cron her 5 dakikada siteyi ping'leyerek uyanık tutar (soğuk başlangıç olmaz).
-  - type: cron
-    name: keep-alive
-    runtime: node
-    plan: free
-    schedule: "*/5 * * * *"
-    buildCommand: "echo keep-alive"
-    startCommand: "sleep 1 && curl -s -o /dev/null -w '%{http_code}' https://swaggybark-panel.onrender.com/api/poll/current"

@@ -1,5 +1,6 @@
 import { manualControl } from '../../utils/poll-state'
 import { emitPollEvent } from '../../utils/bus'
+import { broadcastState } from '../../utils/state'
 import { dayKeyFor } from '~/shared/utils/day'
 
 /**
@@ -32,6 +33,7 @@ export default defineEventHandler(async (event) => {
 
   // 📡 Anlık güncelleme (panel + overlay)
   emitPollEvent({ type: 'state', poll: poll as any })
+  broadcastState()
 
   return { ok: true, action, poll }
 })

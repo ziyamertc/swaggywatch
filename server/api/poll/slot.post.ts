@@ -1,4 +1,5 @@
 import { setSlot, getSlots, type SlotSide } from '../../utils/settings'
+import { broadcastState } from '../../utils/state'
 
 /**
  * POST /api/poll/slot   header: x-admin-key: <ADMIN_KEY>
@@ -22,5 +23,6 @@ export default defineEventHandler(async (event) => {
   }
 
   const clean = await setSlot(side, body?.config ?? {})
+  broadcastState()
   return { ok: true, side, slot: clean, slots: await getSlots() }
 })

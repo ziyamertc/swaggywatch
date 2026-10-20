@@ -13,7 +13,7 @@
     "db:dump": "node --env-file=.env scripts/db-dump.mjs",
     "db:clean": "node --env-file=.env scripts/db-clean.mjs",
     "simulate:votes": "node --env-file=.env scripts/simulate-votes.mjs",
-    "test:sse": "node --env-file=.env scripts/sse-test.mjs",
+    "test:sse": "node --env-file=.env scripts/sse-test.mjs",`n    "test:ws": "node scripts/ws-test.mjs",
     "live-test": "node --env-file=.env scripts/live-test.mjs",
     "test": "node scripts/day-key.test.mjs && node scripts/state-machine.test.mjs",
     "test:day": "node scripts/day-key.test.mjs",

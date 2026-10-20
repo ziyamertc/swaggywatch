@@ -1,4 +1,5 @@
 import { setSetting, getQuestion } from '../../utils/settings'
+import { broadcastState } from '../../utils/state'
 
 /**
  * POST /api/poll/question   header: x-admin-key: <ADMIN_KEY>
@@ -22,5 +23,6 @@ export default defineEventHandler(async (event) => {
   }
 
   await setSetting('question', question)
+  broadcastState()
   return { ok: true, question: await getQuestion() }
 })

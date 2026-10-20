@@ -374,21 +374,35 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKey)
 })
 
-/* ---------------- Anlık güncelleme (SSE) + uçuşan +1 ---------------- */
+/* ---------------- Anlık güncelleme (WebSocket + SSE) + uçuşan +1 ---------------- */
 const { floats, push: pushFloat } = useVoteFloats()
 
-const { connected: liveConnected } = useLiveUpdates((evt) => {
-  // oy anında geldi → +1 uçsun, sayaçlar güncellensin
-  if (evt.poll) {
+const { connected: liveConnected, transport: liveTransport } = useLiveUpdates((evt: any) => {
+  // WebSocket tam durum gönderir → her şey anında güncellenir (F5 gerekmez)
+  if (evt.state && cur.value) {
+    const s = evt.state
+    cur.value = {
+      ...cur.value,
+      poll: s.poll ?? cur.value.poll,
+      question: s.question ?? cur.value.question,
+      slots: s.slots ?? cur.value.slots,
+      trend: s.trend ?? cur.value.trend,
+      live: s.live,
+      streamOk: s.streamOk,
+      streamTitle: s.streamTitle,
+      channel: s.channel ?? cur.value.channel,
+      todayKey: s.todayKey ?? cur.value.todayKey,
+      nextReset: s.nextReset ?? cur.value.nextReset
+    }
+    livePoll.value = s.poll ?? null
+    return
+  }
+  // SSE: oy olayı → +1 animasyonu
+  if (evt.poll && cur.value) {
     livePoll.value = evt.poll as PollDTO
   }
   if (evt.type === 'vote' && evt.choice) {
     pushFloat(evt.choice)
-  }
-  if (evt.type === 'state') {
-    // yayıncı oylamayı açtı/kapattı → tüm verileri tazele
-    refreshCur()
-    refreshHist()
   }
 })
 
@@ -454,6 +468,14 @@ const verdict = computed(() => {
   if (p >= .3) return 'Hafif HAYIR'
   if (p >= .1) return 'GÜÇLÜ HAYIR'
   return 'Neredeyse kesin HAYIR'
+})
+
+// Sekme başlığı: "Beklenti %71" (oy yokken "Beklenti %—")
+useHead({
+  title: computed(() => {
+    const p = total.value ? yesPct.value : null
+    return `Beklenti ${p === null ? '%—' : '%' + p} • ${channelName.value}`
+  })
 })
 
 /* ---------------- Topluluk Skoru ----------------

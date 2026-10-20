@@ -4,6 +4,7 @@ import { getStreamStatus } from '../../utils/kick'
 import { ipHash, getClientIp, getUserAgent } from '../../utils/hash'
 import { logVote } from '../../utils/vote-log'
 import { emitPollEvent } from '../../utils/bus'
+import { broadcastState } from '../../utils/state'
 import { dayKeyFor } from '~/shared/utils/day'
 
 /**
@@ -75,6 +76,9 @@ export default defineEventHandler(async (event) => {
 
   // 📡 Anlık güncelleme: tüm ekranlara (panel + overlay) bildir
   emitPollEvent({ type: 'vote', choice, poll: poll as any })
+
+  // 📡 WebSocket ile TÜM istemcilere tam durumu gönder (F5 gerekmez)
+  broadcastState()
 
   return { ok: true, result, poll }
 })

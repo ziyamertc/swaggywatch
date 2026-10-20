@@ -128,6 +128,13 @@ const verdict = computed(() => {
   return 'NEREDEYSE KESİN HAYIR'
 })
 
+// Sekme başlığı: "Beklenti %71"
+useHead({
+  title: computed(() =>
+    `Beklenti ${total.value ? '%' + yesPct.value : '%—'} • ${channelName.value}`
+  )
+})
+
 const statusNote = computed(() => {
   const s = poll.value?.status
   if (s === 'closed_stream') return 'yayın bitince açılacak'
@@ -143,11 +150,26 @@ onMounted(() => {
   if (cur.value?.channel?.avatar) avatar.value = cur.value.channel.avatar
 })
 
-/* ---------------- Anlık güncelleme (SSE) + uçuşan +1 ---------------- */
+/* ---------------- Anlık güncelleme (WebSocket + SSE) + uçuşan +1 ---------------- */
 const { floats, push: pushFloat } = useVoteFloats()
 const livePoll = ref<PollDTO | null>(null)
 
-useLiveUpdates((evt) => {
+useLiveUpdates((evt: any) => {
+  if (evt.state && cur.value) {
+    const s = evt.state
+    cur.value = {
+      ...cur.value,
+      poll: s.poll ?? cur.value.poll,
+      question: s.question ?? cur.value.question,
+      live: s.live,
+      streamOk: s.streamOk,
+      streamTitle: s.streamTitle,
+      channel: s.channel ?? cur.value.channel,
+      todayKey: s.todayKey ?? cur.value.todayKey
+    }
+    livePoll.value = s.poll ?? null
+    return
+  }
   if (evt.poll) {
     livePoll.value = evt.poll as PollDTO
   }

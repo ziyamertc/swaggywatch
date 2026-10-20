@@ -18,11 +18,10 @@ export default defineNuxtConfig({
     }
   },
   nitro: {
-    // Ücretsiz planlarda (Render) instance'ın uykuya dalmasını engellemek için
-    // kendi kendine periyodik istek atan görev. Dışarıdan cron servisi kurmaya
-    // gerek yok (Render cron job'ları aylık en az $1 + kart istiyor).
+    // WebSocket desteği (anlık güncelleme) — sayfa F5'e gerek kalmaz
     experimental: {
-      tasks: true
+      tasks: true,
+      websocket: true
     },
     scheduledTasks: {
       '*/5 * * * *': ['poll:keepalive']

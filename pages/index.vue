@@ -36,7 +36,10 @@
     </header>
 
     <div v-if="!streamOk" class="mini-warn">⚠️ Kick yayın durumu alınamadı — oylama normal şekilde devam ediyor.</div>
-    <div v-if="store === 'memory'" class="mini-warn">🧪 Veritabanı bağlı değil — test modu (RAM).</div>
+    <div v-if="store === 'memory'" class="mini-warn">
+      🧪 Veritabanı bağlı değil — test modu (RAM).
+      <span v-if="dbError" style="display:block;margin-top:4px;opacity:.85">Hata: {{ dbError }}</span>
+    </div>
 
     <!-- 1) BEKLENTİ HESABI -->
     <section class="panel panel-hero">
@@ -275,6 +278,7 @@ interface CurrentDTO {
   todayKey: string
   nextReset: string
   store: 'mongo' | 'memory'
+  dbError?: string | null
 }
 
 /* SSR'da da veri gelsin → ilk yüklemede boş ekran olmasın */
@@ -309,6 +313,7 @@ function slotStyle(s: SlotConfig) {
   }
 }
 const store = computed(() => cur.value?.store ?? 'mongo')
+const dbError = computed(() => cur.value?.dbError ?? null)
 const history = computed(() => hist.value?.polls ?? [])
 
 const MyVoteLS = 'swaggybark_oyum_v1'

@@ -77,7 +77,13 @@ export const mongoConfigured = !!process.env.MONGODB_URI
 
 /** Bağlantı başarısız olursa bellek moduna düşeriz (sistem çökmez, uyarı basar). */
 let connFailedAt = 0
+let lastError: string | null = null
 const RETRY_AFTER = 5 * 60 * 1000
+
+/** Son bağlantı hatasının mesajı (panelde gösterilmek için). */
+export function getLastDbError(): string | null {
+  return lastError
+}
 
 export async function getPollModel(): Promise<Model<PollDocument> | null> {
   if (!mongoConfigured) return null
@@ -102,6 +108,7 @@ export async function getPollModel(): Promise<Model<PollDocument> | null> {
     return g.__swaggybark_model
   } catch (err: any) {
     connFailedAt = Date.now()
+    lastError = String(err?.message || err).slice(0, 200)
     g.__swaggybark_connPromise = null
     console.error(
       '[db] MongoDB bağlantısı başarısız — bellek moduna düşülüyor:',

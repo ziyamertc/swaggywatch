@@ -22,12 +22,12 @@
         <h1 class="ov-question">{{ question }}</h1>
 
         <div class="ov-buttons">
-          <button class="ov-btn ov-yes" :disabled="!votingOpen" :class="{ mine: myChoice === 'yes' }" @click="vote('yes')">
+          <button class="ov-btn ov-yes" :disabled="!canVote" :class="{ mine: myChoice === 'yes' }" @click="vote('yes')">
             <span class="ov-big">EVET</span>
             <span class="ov-pct">{{ total ? yesPct + '%' : '—' }}</span>
             <span class="ov-n">{{ poll?.yes ?? 0 }}</span>
           </button>
-          <button class="ov-btn ov-no" :disabled="!votingOpen" :class="{ mine: myChoice === 'no' }" @click="vote('no')">
+          <button class="ov-btn ov-no" :disabled="!canVote" :class="{ mine: myChoice === 'no' }" @click="vote('no')">
             <span class="ov-big">HAYIR</span>
             <span class="ov-pct">{{ total ? (100 - yesPct) + '%' : '—' }}</span>
             <span class="ov-n">{{ poll?.no ?? 0 }}</span>
@@ -42,6 +42,14 @@
           <img :src="slots.right.url" :alt="slots.right.title">
         </a>
       </aside>
+    </div>
+
+    <!-- Oy değiştirme butonu -->
+    <div class="ov-change" v-if="myChoice && votingOpen">
+      <button class="ov-change-btn" @click="openChangeWindow" :disabled="changeWindowOpen">
+        <template v-if="changeWindowOpen">⏳ {{ changeSecondsLeft }} sn</template>
+        <template v-else>✏️ Oyumu Değiştir (1 dk)</template>
+      </button>
     </div>
 
     <!-- SONUÇ BARI -->
@@ -64,6 +72,7 @@ import { dayKeyFor } from '~/shared/utils/day'
 interface PollDTO {
   dayKey: string; yes: number; no: number
   status: 'active' | 'closed_stream' | 'closed_manual' | 'ended_day'
+  votesEpoch: string
 }
 
 const { data: cur, refresh } = await useFetch<any>('/api/poll/current', { key: 'ov-current' })
@@ -85,17 +94,27 @@ const question = computed(() => cur.value?.question || 'Dayı bugün yayın aça
 const channelName = computed(() => cur.value?.channel?.username || 'SWAGGYBARK')
 const avatar = ref<string | null>(null)
 // Tarayıcı sekmesi ikonu = kanal logosu
-useFavicon(computed(() => cur.value?.channel?.avatar || null))
-// Tarayıcı sekmesi ikonu = kanal logosu
 useFavicon(computed(() => avatar.value))
+const nowTs = ref(Date.now())
 const total = computed(() => (poll.value ? poll.value.yes + poll.value.no : 0))
 const yesPct = computed(() => (total.value ? Math.round((poll.value!.yes / total.value) * 100) : 0))
 const votingOpen = computed(() => poll.value?.status === 'active' && poll.value?.dayKey === dayKeyFor())
 
-const myVote = ref<{ day: string; choice: 'yes' | 'no' } | null>(null)
-const myChoice = computed(() =>
-  myVote.value && poll.value && myVote.value.day === poll.value.dayKey ? myVote.value.choice : null
-)
+const myVote = ref<{ day: string; choice: 'yes' | 'no'; epoch?: string } | null>(null)
+const changeUntil = ref(0)
+const myChoice = computed(() => {
+  if (!myVote.value || !poll.value) return null
+  if (myVote.value.day !== poll.value.dayKey) return null
+  if (myVote.value.epoch && poll.value.votesEpoch && myVote.value.epoch !== poll.value.votesEpoch) return null
+  return myVote.value.choice
+})
+const changeWindowOpen = computed(() => changeUntil.value > nowTs.value)
+const changeSecondsLeft = computed(() => Math.max(0, Math.ceil((changeUntil.value - nowTs.value) / 1000)))
+const canVote = computed(() => {
+  if (!votingOpen.value) return false
+  if (!myChoice.value) return true
+  return changeWindowOpen.value
+})
 
 const verdict = computed(() => {
   if (!total.value) return 'OY BEKLENİYOR'
@@ -119,7 +138,8 @@ const statusNote = computed(() => {
 onMounted(() => {
   try { myVote.value = JSON.parse(localStorage.getItem('swaggybark_oyum_v1') || 'null') } catch { myVote.value = null }
   const t = setInterval(() => refresh(), 60_000)
-  onBeforeUnmount(() => clearInterval(t))
+  const tick = setInterval(() => { nowTs.value = Date.now() }, 1000)
+  onBeforeUnmount(() => { clearInterval(t); clearInterval(tick) })
   if (cur.value?.channel?.avatar) avatar.value = cur.value.channel.avatar
 })
 
@@ -139,15 +159,23 @@ useLiveUpdates((evt) => {
 watch(() => cur.value?.channel?.avatar, v => { if (v) avatar.value = v })
 
 async function vote(choice: 'yes' | 'no') {
-  if (!votingOpen.value) return
+  if (!canVote.value) return
   try {
     const res: any = await $fetch('/api/poll/vote', { method: 'POST', body: { choice } })
     if (res?.poll) {
-      myVote.value = { day: res.poll.dayKey, choice }
+      myVote.value = { day: res.poll.dayKey, choice, epoch: res.poll.votesEpoch }
       localStorage.setItem('swaggybark_oyum_v1', JSON.stringify(myVote.value))
+      if (res.result === 'changed') changeUntil.value = 0
     }
     await refresh()
   } catch { /* oy alınamadı */ }
+}
+
+async function openChangeWindow() {
+  try {
+    const res: any = await $fetch('/api/poll/change-window', { method: 'POST' })
+    changeUntil.value = res.until || 0
+  } catch { /* pencere açılamadı */ }
 }
 </script>
 
@@ -214,6 +242,15 @@ async function vote(choice: 'yes' | 'no') {
 .ov-buttons{display:flex;gap:2vw;flex:1;min-height:0;position:relative}
 .ov-pct{font-size:5.4vh;font-weight:700;opacity:.85;line-height:1}
 .ov-n{font-size:2.2vh;font-weight:600;opacity:.7}
+
+.ov-change{display:flex;justify-content:center;margin-top:1.2vh;flex:0 0 auto}
+.ov-change-btn{
+  background:rgba(232,185,60,.12);border:1px solid rgba(232,185,60,.45);color:#E8C66B;
+  font-family:'Chakra Petch',sans-serif;font-size:1.8vh;font-weight:600;letter-spacing:.5px;
+  padding:1vh 2.4vh;border-radius:1vh;cursor:pointer;transition:.2s;
+}
+.ov-change-btn:hover:not(:disabled){background:rgba(232,185,60,.2);color:#F0D07A}
+.ov-change-btn:disabled{opacity:.8;cursor:default}
 
 .ov-bar{
   display:flex;height:2.6vh;border-radius:1.3vh;overflow:hidden;

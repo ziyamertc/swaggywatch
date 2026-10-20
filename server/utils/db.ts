@@ -13,7 +13,13 @@ export interface PollDocument extends Document {
   dayKey: string
   yes: number
   no: number
-  votes: { h: string; c: 'yes' | 'no' }[]
+  votes: {
+    h: string
+    c: 'yes' | 'no'
+    at?: Date
+    changeUntil?: Date | null   // oy değiştirme penceresi (1 dk)
+  }[]
+  votesEpoch: string            // oylar sıfırlandığında yenilenir → eski oy kaydı geçersizleşir
   status: PollStatus
   manualOverride: boolean   // yayıncı yayın sırasında oylamayı açık tuttu
   createdAt: Date
@@ -30,8 +36,11 @@ const PollSchema = new Schema<PollDocument>({
   votes: [{
     _id: false,
     h: { type: String, required: true },
-    c: { type: String, required: true, enum: ['yes', 'no'] }
+    c: { type: String, required: true, enum: ['yes', 'no'] },
+    at: { type: Date, default: Date.now },
+    changeUntil: { type: Date, default: null }
   }],
+  votesEpoch: { type: String, required: false, default: '' },
   status: { type: String, enum: ['active', 'closed_stream', 'closed_manual', 'ended_day'], default: 'active' },
   manualOverride: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },

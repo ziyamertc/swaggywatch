@@ -50,6 +50,13 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: reason })
   }
 
+  if (result === 'locked') {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Oyunu değiştirmek için önce "✏️ Oyumu Değiştir" butonuna bas (1 dakika süreli)'
+    })
+  }
+
   // 📋 Admin logu: IP, tarayıcı, saat, oy (sadece admin panelinde görünür)
   if (result === 'added' || result === 'changed') {
     try {

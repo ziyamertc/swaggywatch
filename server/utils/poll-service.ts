@@ -9,6 +9,7 @@ export interface PollDTO {
   no: number
   status: PollStatus
   manualOverride: boolean
+  votesEpoch: string
   closedAt: string | null
   reopenedAt: string | null
   endedAt: string | null
@@ -22,6 +23,7 @@ export function toDTO(p: PollDocument | MemPoll): PollDTO {
     no: p.no,
     status: p.status,
     manualOverride: !!p.manualOverride,
+    votesEpoch: (p as any).votesEpoch || '',
     closedAt: p.closedAt ? new Date(p.closedAt).toISOString() : null,
     reopenedAt: p.reopenedAt ? new Date(p.reopenedAt).toISOString() : null,
     endedAt: p.endedAt ? new Date(p.endedAt).toISOString() : null,
@@ -29,7 +31,7 @@ export function toDTO(p: PollDocument | MemPoll): PollDTO {
   }
 }
 
-export type VoteResult = 'added' | 'changed' | 'unchanged' | 'closed'
+export type VoteResult = 'added' | 'changed' | 'unchanged' | 'closed' | 'locked'
 
 export const storeMode = (): 'mongo' | 'memory' => (mongoConfigured ? 'mongo' : 'memory')
 
@@ -83,15 +85,29 @@ export async function ensurePoll(dayKey: string): Promise<PollDTO> {
   }
 
   const existing = await Model.findOne({ dayKey }).lean<PollDocument>()
-  if (existing) return toDTO(existing)
+  if (existing) {
+    // eski kayıtlarda votesEpoch yok → bir kez ata (istemcilerin oyunu
+    // geçersizleştirebilmesi için şart)
+    if (!existing.votesEpoch) {
+      const ep = newEpoch()
+      await Model.updateOne({ dayKey }, { $set: { votesEpoch: ep } })
+      existing.votesEpoch = ep
+    }
+    return toDTO(existing)
+  }
 
   try {
-    await Model.create({ dayKey })
+    await Model.create({ dayKey, votesEpoch: newEpoch() })
   } catch (err: any) {
     if (err?.code !== 11000) throw err // 11000 = duplicate key, sorun değil
   }
   const created = await Model.findOne({ dayKey }).lean<PollDocument>()
   return toDTO(created!)
+}
+
+/** Oylar sıfırlandığında değişen kimlik (istemcilerin eski oyunu geçersizleştirmesi için). */
+export function newEpoch(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 }
 
 export async function getPollRaw(dayKey: string): Promise<PollDTO | MemPoll | null> {
@@ -121,12 +137,16 @@ export async function castVote(
     const existing = p.votes.find(v => v.h === hash)
     if (existing) {
       if (existing.c === choice) return { poll: toDTO(p), result: 'unchanged' }
+      // değiştirme penceresi açık mı?
+      const until = existing.changeUntil ? new Date(existing.changeUntil).getTime() : 0
+      if (until < Date.now()) return { poll: toDTO(p), result: 'locked' }
       p[existing.c] = Math.max(0, p[existing.c] - 1)
       p[choice]++
       existing.c = choice
+      existing.changeUntil = null
       return { poll: toDTO(p), result: 'changed' }
     }
-    p.votes.push({ h: hash, c: choice })
+    p.votes.push({ h: hash, c: choice, at: new Date() })
     p[choice]++
     return { poll: toDTO(p), result: 'added' }
   }
@@ -134,11 +154,16 @@ export async function castVote(
   const existing = (raw as PollDocument).votes.find(v => v.h === hash)
   if (existing) {
     if (existing.c === choice) return { poll: toDTO(raw as PollDocument), result: 'unchanged' }
+    // 🔒 oy değiştirmek için önce 1 dakikalık pencere açılmalı
+    const until = existing.changeUntil ? new Date(existing.changeUntil).getTime() : 0
+    if (until < Date.now()) {
+      return { poll: toDTO(raw as PollDocument), result: 'locked' }
+    }
     const inc = { [choice]: +1 } as Record<string, number>
     inc[existing.c] = -1
     const updated = await Model.findOneAndUpdate(
       { dayKey, 'votes.h': hash },
-      { $set: { 'votes.$.c': choice }, $inc: inc },
+      { $set: { 'votes.$.c': choice, 'votes.$.changeUntil': null }, $inc: inc },
       { new: true, lean: true }
     ).lean<PollDocument>()
     return { poll: updated ? toDTO(updated) : null, result: 'changed' }
@@ -146,7 +171,7 @@ export async function castVote(
 
   const updated = await Model.findOneAndUpdate(
     { dayKey, votes: { $not: { $elemMatch: { h: hash } } } },
-    { $push: { votes: { h: hash, c: choice } }, $inc: { [choice]: 1 } },
+    { $push: { votes: { h: hash, c: choice, at: new Date(), changeUntil: null } }, $inc: { [choice]: 1 } },
     { new: true, lean: true }
   ).lean<PollDocument>()
 
@@ -284,10 +309,44 @@ export async function listEndedPolls(limit = 60): Promise<PollDTO[]> {
 }
 
 /**
+ * Oy değiştirme penceresini açar (60 saniye).
+ * Oyunu değiştirmek için önce bu çağrılmalı — sunucu tarafında kontrol edilir.
+ */
+export async function openChangeWindow(
+  dayKey: string,
+  hash: string,
+  seconds = 60
+): Promise<{ until: number; poll: PollDTO | null }> {
+  const raw = await getPollRaw(dayKey)
+  if (!raw) return { until: 0, poll: null }
+  const until = new Date(Date.now() + seconds * 1000)
+  const Model = await getPollModel()
+
+  if (!Model) {
+    const p = raw as MemPoll
+    const v = p.votes.find(x => x.h === hash)
+    if (!v) return { until: 0, poll: toDTO(p) }
+    v.changeUntil = until.toISOString()
+    return { until: until.getTime(), poll: toDTO(p) }
+  }
+
+  const updated = await Model.findOneAndUpdate(
+    { dayKey, 'votes.h': hash },
+    { $set: { 'votes.$.changeUntil': until } },
+    { new: true, lean: true }
+  ).lean<PollDocument>()
+
+  if (!updated) return { until: 0, poll: toDTO(raw as PollDocument) }
+  return { until: until.getTime(), poll: toDTO(updated) }
+}
+
+/**
  * Oyları sil / sıfırla.
  *  scope='today' → bugünün oyları, oy kayıtları ve trend noktaları temizlenir
  *                 (gün satırı kalır, arşiv bozulmaz)
  *  scope='all'   → tüm günlerin oyları + log + trend tamamen silinir
+ *
+ * votesEpoch yenilenir → tarayıcıdaki eski oy kaydı geçersizleşir, kullanıcı tekrar oy verebilir.
  */
 export async function clearVotes(
   scope: 'today' | 'all',
@@ -296,18 +355,23 @@ export async function clearVotes(
   const Model = await getPollModel()
   const LogModel = await getVoteLogModel()
   const SnapModel = await getSnapshotModel()
+  const epoch = newEpoch()
   let polls = 0, logs = 0, snapshots = 0
 
   if (scope === 'today') {
     if (Model) {
       const r = await Model.updateOne(
         { dayKey: todayKey },
-        { $set: { yes: 0, no: 0, votes: [], reopenedAt: new Date() } }
+        { $set: { yes: 0, no: 0, votes: [], votesEpoch: epoch, reopenedAt: new Date() } }
       )
       polls = r.modifiedCount || 0
     } else {
       const p = mem.polls.get(todayKey)
-      if (p) { p.yes = 0; p.no = 0; p.votes = []; polls = 1 }
+      if (p) {
+        p.yes = 0; p.no = 0; p.votes = []
+        ;(p as any).votesEpoch = epoch
+        polls = 1
+      }
     }
     if (LogModel) {
       const r = await LogModel.deleteMany({ dayKey: todayKey })

@@ -152,16 +152,25 @@
       </div>
 
       <div class="votes">
-        <button class="vote-btn vote-yes" :disabled="!votingOpen" :class="{ mine: votingOpen && myChoice === 'yes' }" @click="vote('yes')">
+        <button class="vote-btn vote-yes" :disabled="!canVote" :class="{ mine: votingOpen && myChoice === 'yes' }" @click="vote('yes')">
           <small>EVET</small>✅
         </button>
-        <button class="vote-btn vote-no" :disabled="!votingOpen" :class="{ mine: votingOpen && myChoice === 'no' }" @click="vote('no')">
+        <button class="vote-btn vote-no" :disabled="!canVote" :class="{ mine: votingOpen && myChoice === 'no' }" @click="vote('no')">
           <small>HAYIR</small>❌
         </button>
         <VoteFloats :floats="floats" />
       </div>
 
       <div v-if="voteNote" class="vote-note" v-html="voteNote"></div>
+
+      <!-- Oy değiştirme butonu (1 dakika) -->
+      <div class="change-row" v-if="myChoice && votingOpen">
+        <button class="ghost btn-change" @click="openChangeWindow" :disabled="changeWindowOpen">
+          <template v-if="changeWindowOpen">⏳ Değiştirme penceresi: {{ changeSecondsLeft }} sn</template>
+          <template v-else>✏️ Oyumu Değiştir (1 dk)</template>
+        </button>
+      </div>
+
       <div class="reset-note">⏰ Sonraki yeni gün oylaması: {{ countdown }}</div>
     </section>
 
@@ -239,6 +248,7 @@ interface PollDTO {
   no: number
   status: PollStatus
   manualOverride: boolean
+  votesEpoch: string
   closedAt: string | null
   reopenedAt: string | null
   endedAt: string | null
@@ -317,7 +327,10 @@ const dbError = computed(() => cur.value?.dbError ?? null)
 const history = computed(() => hist.value?.polls ?? [])
 
 const MyVoteLS = 'swaggybark_oyum_v1'
-const myVote = ref<{ day: string; choice: 'yes' | 'no' } | null>(null)
+/** { day, choice, epoch } — epoch, oylar sıfırlandığında değişir (eski oy geçersizleşir) */
+const myVote = ref<{ day: string; choice: 'yes' | 'no'; epoch?: string } | null>(null)
+/** Değiştirme penceresi bitiş zamanı (ms) */
+const changeUntil = ref(0)
 const avatarFailed = ref(false)
 
 const clientDayKey = ref(dayKeyFor())
@@ -389,7 +402,21 @@ const votingOpen = computed(() =>
 )
 const myChoice = computed(() => {
   if (!myVote.value || !poll.value) return null
-  return myVote.value.day === poll.value.dayKey ? myVote.value.choice : null
+  if (myVote.value.day !== poll.value.dayKey) return null
+  // oylar sıfırlandıysa (epoch değişti) eski oy kaydı geçersiz → tekrar oy verilebilir
+  if (myVote.value.epoch && poll.value.votesEpoch && myVote.value.epoch !== poll.value.votesEpoch) return null
+  return myVote.value.choice
+})
+
+// Değiştirme penceresi (60 sn) açık mı?
+const changeWindowOpen = computed(() => changeUntil.value > nowTs.value)
+const changeSecondsLeft = computed(() => Math.max(0, Math.ceil((changeUntil.value - nowTs.value) / 1000)))
+
+// Butonlar kilidi: oylama kapalıysa ya da (oy verildi ama değiştirme penceresi yoksa)
+const canVote = computed(() => {
+  if (!votingOpen.value) return false
+  if (!myChoice.value) return true
+  return changeWindowOpen.value
 })
 const pastDays = computed(() => history.value.filter(d => d.dayKey !== clientDayKey.value))
 
@@ -409,8 +436,8 @@ const banner = computed(() => {
 })
 
 const voteNote = computed(() => {
-  if (myChoice.value === 'yes') return '✅ Oyun <b class="y">EVET</b> olarak kaydedildi. Bugün için tek oy hakkın var — <b>diğer butona</b> basarak değiştirebilirsin.'
-  if (myChoice.value === 'no') return '❌ Oyun <b class="n">HAYIR</b> olarak kaydedildi. Bugün için tek oy hakkın var — <b>diğer butona</b> basarak değiştirebilirsin.'
+  if (myChoice.value === 'yes') return '✅ Oyun <b class="y">EVET</b> olarak kaydedildi. Bugün için tek oy hakkın var — değiştirmek için aşağıdaki butonu kullan.'
+  if (myChoice.value === 'no') return '❌ Oyun <b class="n">HAYIR</b> olarak kaydedildi. Bugün için tek oy hakkın var — değiştirmek için aşağıdaki butonu kullan.'
   if (!activeDay.value) return 'Bugün henüz oylama yok — gece 03:00\'ta başlayacak.'
   if (!votingOpen.value) return 'Oylama şu an kapalı — yukarıdaki bildirime bak.'
   return 'Seçimini yap ve oyun kaydedilsin — günde 1 oy hakkın var.'
@@ -601,17 +628,17 @@ function endReasonText(status: PollStatus) {
 
 /* ---------------- Oy ---------------- */
 async function vote(choice: 'yes' | 'no') {
-  if (!votingOpen.value) return
+  if (!canVote.value) return
   try {
-    await $fetch<{ ok: boolean; result: string; poll: PollDTO }>('/api/poll/vote', {
+    const res: any = await $fetch<{ ok: boolean; result: string; poll: PollDTO }>('/api/poll/vote', {
       method: 'POST',
       body: { choice }
     })
-    const res = cur.value
-    if (res) {
-      myVote.value = { day: res.poll.dayKey, choice }
-      localStorage.setItem(MyVoteLS, JSON.stringify(myVote.value))
-    }
+    poll.value = res.poll
+    myVote.value = { day: res.poll.dayKey, choice, epoch: res.poll.votesEpoch }
+    localStorage.setItem(MyVoteLS, JSON.stringify(myVote.value))
+    // oy değiştirildiyse pencereyi kapat
+    if (res.result === 'changed') changeUntil.value = 0
     addRipple(choice === 'yes' ? btnYesEl.value : btnNoEl.value)
     await refreshCur()
     await refreshHist()
@@ -621,6 +648,16 @@ async function vote(choice: 'yes' | 'no') {
     } else {
       console.error('Oy hatası:', err?.data?.statusMessage || err)
     }
+  }
+}
+
+/** 1 dakikalık oy değiştirme penceresini açar (sunucu tarafında doğrulanır). */
+async function openChangeWindow() {
+  try {
+    const res: any = await $fetch('/api/poll/change-window', { method: 'POST' })
+    changeUntil.value = res.until || 0
+  } catch (err: any) {
+    console.error('Değiştirme penceresi açılamadı:', err?.data?.statusMessage || err)
   }
 }
 

@@ -293,6 +293,15 @@ body{
   pointer-events:none;
 }
 
+/* ---------- Oy değiştirme butonu ---------- */
+.change-row{display:flex;justify-content:center;margin-top:12px}
+.btn-change{
+  color:#E8B93C;border-color:rgba(232,185,60,.4);
+  font-size:13px;letter-spacing:.3px;
+}
+.btn-change:hover:not(:disabled){border-color:#E8B93C;color:#F0D07A;background:rgba(232,185,60,.08)}
+.btn-change:disabled{opacity:.75;cursor:default}
+
 /* ---------- Vote buttons ---------- */
 .votes{display:grid;grid-template-columns:1fr 1fr;gap:14px;position:relative}
 .vote-btn{

@@ -84,6 +84,10 @@ const live = computed(() => !!cur.value?.live)
 const question = computed(() => cur.value?.question || 'Dayı bugün yayın açacak mı?')
 const channelName = computed(() => cur.value?.channel?.username || 'SWAGGYBARK')
 const avatar = ref<string | null>(null)
+// Tarayıcı sekmesi ikonu = kanal logosu
+useFavicon(computed(() => cur.value?.channel?.avatar || null))
+// Tarayıcı sekmesi ikonu = kanal logosu
+useFavicon(computed(() => avatar.value))
 const total = computed(() => (poll.value ? poll.value.yes + poll.value.no : 0))
 const yesPct = computed(() => (total.value ? Math.round((poll.value!.yes / total.value) * 100) : 0))
 const votingOpen = computed(() => poll.value?.status === 'active' && poll.value?.dayKey === dayKeyFor())

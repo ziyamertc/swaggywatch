@@ -3,7 +3,8 @@
     <header class="main-header">
       <div class="brand">
         <div class="logo-slot small">
-          <span class="logo-fallback">🎛</span>
+          <img v-if="avatar" :src="avatar" alt="Kanal logosu" @error="avatar = null">
+          <span v-else class="logo-fallback">🎛</span>
         </div>
         <div class="brand-info">
           <h1>YAYINCI <span>KONTROLÜ</span></h1>
@@ -12,6 +13,7 @@
       </div>
       <div class="status-strip">
         <NuxtLink to="/" class="pill pill-ghost">← Panele dön</NuxtLink>
+        <button class="pill pill-ghost" @click="allOpen = !allOpen">{{ allOpen ? '▲ Hepsini kapat' : '▼ Hepsini aç' }}</button>
       </div>
     </header>
 
@@ -27,11 +29,8 @@
 
     <!-- kontrol paneli -->
     <template v-else>
-      <section class="panel">
-        <div class="panel-title">
-          <span>📺 Oylama Durumu</span>
-          <span>{{ pollStatusText }}</span>
-        </div>
+      <!-- OYLAMA DURUMU -->
+      <AdminSection title="📺 Oylama Durumu" :sub="pollStatusText" :open="sec.durum" @update:open="v => sec.durum = v">
         <div class="stat-row" style="margin-bottom:16px">
           <span class="yes-c">✅ EVET — {{ poll?.yes ?? 0 }}</span>
           <span class="no-c">❌ HAYIR — {{ poll?.no ?? 0 }}</span>
@@ -43,27 +42,19 @@
           <button class="ghost btn-danger" @click="logout">🚪 Çıkış</button>
         </div>
         <div v-if="msg" class="vote-note" style="text-align:left" v-html="msg"></div>
-      </section>
+      </AdminSection>
 
-      <section class="panel">
-        <div class="panel-title"><span>❓ Oylama Sorusu</span><span>panelde ve overlay'da görünür</span></div>
+      <!-- OYLAMA SORUSU -->
+      <AdminSection title="❓ Oylama Sorusu" sub="panelde ve overlay'da görünür" :open="sec.soru" @update:open="v => sec.soru = v">
         <input v-model="questionInput" class="admin-input" maxlength="160" placeholder="Dayı bugün yayın açacak mı?" @keyup.enter="saveQuestion">
         <div class="admin-row" style="margin-top:10px">
           <button class="ghost btn-ok" @click="saveQuestion">💾 Soruyu Kaydet</button>
         </div>
         <div v-if="questionMsg" class="vote-note" style="text-align:left" v-html="questionMsg"></div>
-      </section>
+      </AdminSection>
 
-      <section class="panel">
-        <div class="panel-title">
-          <span>📋 Oylama Logu</span>
-          <span>
-            <button class="ghost btn-sm" @click="loadLog()">🔄 Yenile</button>
-            <button class="ghost btn-sm btn-danger" @click="clearLog()">🗑 Temizle</button>
-          </span>
-        </div>
-
-        <!-- istatistikler -->
+      <!-- OYLAMA LOGU -->
+      <AdminSection title="📋 Oylama Logu" :sub="logStats ? `${logStats.toplam} kayıt • ${logStats.benzersizIp} IP` : 'IP, tarayıcı, saat'" :open="sec.log" @update:open="v => sec.log = v">
         <div class="log-stats" v-if="logStats">
           <div class="log-stat"><b>{{ logStats.toplam }}</b><span>toplam kayıt</span></div>
           <div class="log-stat"><b>{{ logStats.benzersizIp }}</b><span>benzersiz IP</span></div>
@@ -79,10 +70,11 @@
           </div>
         </div>
 
-        <!-- filtre -->
         <div class="log-filter">
           <button class="ghost btn-sm" :class="{ active: logScope === 'today' }" @click="setLogScope('today')">📅 Bugün</button>
           <button class="ghost btn-sm" :class="{ active: logScope === 'all' }" @click="setLogScope('all')">🗂️ Tüm günler</button>
+          <button class="ghost btn-sm" @click="loadLog()">🔄 Yenile</button>
+          <button class="ghost btn-sm btn-danger" @click="clearLog()">🗑 Temizle</button>
           <span class="log-count" v-if="logEntries.length">{{ logEntries.length }} kayıt</span>
         </div>
 
@@ -116,11 +108,10 @@
           ⚠️ IP adresleri kişisel veridir. "Temizle" ile kalıcı olarak silinebilir.
           Bu bölüm yalnızca <b>ADMIN_KEY</b> erişimi olanlara görünür.
         </div>
-      </section>
+      </AdminSection>
 
-      <section class="panel">
-        <div class="panel-title"><span>🖼️ Yan Reklam Alanları</span><span>sol / sağ boşluk</span></div>
-
+      <!-- YAN REKLAM ALANLARI -->
+      <AdminSection title="🖼️ Yan Reklam Alanları" sub="sol / sağ boşluk" :open="sec.reklam" @update:open="v => sec.reklam = v">
         <div v-for="s in (['left', 'right'] as const)" :key="s" class="slot-editor">
           <div class="slot-editor-head">
             <b>{{ s === 'left' ? '⬅️ SOL ALAN' : 'SAĞ ALAN ➡️' }}</b>
@@ -166,10 +157,10 @@
         </div>
 
         <div v-if="slotMsg" class="vote-note" style="text-align:left" v-html="slotMsg"></div>
-      </section>
+      </AdminSection>
 
-      <section class="panel">
-        <div class="panel-title"><span>📺 Yayın Durumu</span><span>{{ live ? 'YAYINDA' : 'OFFLINE' }}</span></div>
+      <!-- YAYIN DURUMU -->
+      <AdminSection title="📺 Yayın Durumu" :sub="live ? 'YAYINDA' : 'OFFLINE'" :open="sec.yayin" @update:open="v => sec.yayin = v">
         <div class="kv">
           <div><span>Kanal</span><b>{{ channelName }}</b></div>
           <div><span>Yayın</span><b>{{ streamTitle || 'yayın yok' }}</b></div>
@@ -177,7 +168,7 @@
           <div><span>Veritabanı</span><b>{{ store }}</b></div>
         </div>
         <button class="ghost" style="margin-top:14px" @click="refresh">🔄 Yenile</button>
-      </section>
+      </AdminSection>
     </template>
   </div>
 </template>
@@ -193,16 +184,28 @@ const logMsg = ref('')
 const logEntries = ref<any[]>([])
 const logStats = ref<any>(null)
 const logScope = ref<'today' | 'all'>('today')
+const avatar = ref<string | null>(null)
+
+/* Bölümlerin açık/kapalı durumu */
+const sec = reactive({ durum: true, soru: true, log: false, reklam: false, yayin: false })
+const allOpen = ref(false)
+watch(allOpen, (v) => {
+  Object.keys(sec).forEach((k) => { (sec as any)[k] = v })
+})
+
 const slot = reactive({
   left: { enabled: false, url: '', link: '', title: '', width: 260, radius: 16, opacity: 1 },
   right: { enabled: false, url: '', link: '', title: '', width: 260, radius: 16, opacity: 1 }
 })
+
 const poll = ref<any>(null)
 const live = ref(false)
 const streamTitle = ref<string | null>(null)
 const todayKey = ref('')
 const store = ref('')
 const channelName = ref('SWAGGYBARK')
+// Tarayıcı sekmesi ikonu = kanal logosu
+useFavicon(computed(() => avatar.value))
 
 const pollStatusText = computed(() => {
   const s = poll.value?.status
@@ -214,7 +217,6 @@ const pollStatusText = computed(() => {
 })
 
 async function loadLog() {
-  // bugünün anahtarı henüz bilinmiyorsa önce çek
   if (!todayKey.value) {
     try {
       const cur: any = await $fetch('/api/poll/current')
@@ -248,7 +250,7 @@ async function clearLog() {
     const res: any = await $fetch('/api/poll/log', {
       method: 'DELETE',
       headers: { 'x-admin-key': keyInput.value.trim() },
-      query: logScope.value === 'today' ? { day: todayKey.value } : {}
+      query: logScope.value === 'today' && todayKey.value ? { day: todayKey.value } : {}
     })
     logMsg.value = `✔ ${res.deleted} kayıt silindi`
     loadLog()
@@ -280,25 +282,8 @@ async function saveSlot(side: 'left' | 'right') {
   }
 }
 
-async function refresh() {
-  try {
-    const res = await $fetch<any>('/api/poll/current')
-    poll.value = res.poll
-    live.value = res.live
-    streamTitle.value = res.streamTitle
-    todayKey.value = res.todayKey
-    store.value = res.store
-    channelName.value = res.channel?.username || 'SWAGGYBARK'
-    if (!questionInput.value && res.question) questionInput.value = res.question
-    if (res.slots) {
-      Object.assign(slot.left, res.slots.left)
-      Object.assign(slot.right, res.slots.right)
-    }
-  } catch { /* yok */ }
-  if (authed.value) loadLog()
-}
-
-async function saveQuestion() {  const q = questionInput.value.trim()
+async function saveQuestion() {
+  const q = questionInput.value.trim()
   if (!q) { questionMsg.value = '❌ Soru boş olamaz'; return }
   try {
     const res = await $fetch<any>('/api/poll/question', {
@@ -313,16 +298,23 @@ async function saveQuestion() {  const q = questionInput.value.trim()
   }
 }
 
-async function login() {
+async function refresh() {
   try {
-    await $fetch('/api/admin/login', { method: 'POST', body: { key: keyInput.value } })
-    authed.value = true
-    msg.value = '✔ Giriş başarılı'
-    keyInput.value = ''
-    refresh()
-  } catch (err: any) {
-    msg.value = `❌ ${err?.data?.statusMessage || 'Hata'}`
-  }
+    const res = await $fetch<any>('/api/poll/current')
+    poll.value = res.poll
+    live.value = res.live
+    streamTitle.value = res.streamTitle
+    todayKey.value = res.todayKey
+    store.value = res.store
+    channelName.value = res.channel?.username || 'SWAGGYBARK'
+    if (res.channel?.avatar) avatar.value = res.channel.avatar
+    if (!questionInput.value && res.question) questionInput.value = res.question
+    if (res.slots) {
+      Object.assign(slot.left, res.slots.left)
+      Object.assign(slot.right, res.slots.right)
+    }
+  } catch { /* yok */ }
+  if (authed.value) loadLog()
 }
 
 async function control(action: 'open' | 'close' | 'auto') {
@@ -336,7 +328,20 @@ async function control(action: 'open' | 'close' | 'auto') {
     msg.value = '✔ ' + (labels[res.action] || 'Tamam')
     refresh()
   } catch (err: any) {
-    msg.value = `❌ ${err?.data?.statusMessage || 'Yetkisiz'}`
+    msg.value = `❌ ${err?.data?.statusMessage || 'Yetkisiz / hata'}`
+  }
+}
+
+async function login() {
+  try {
+    await $fetch('/api/admin/login', { method: 'POST', body: { key: keyInput.value } })
+    authed.value = true
+    msg.value = '✔ Giriş başarılı'
+    keyInput.value = ''
+    refresh()
+    loadLog()
+  } catch (err: any) {
+    msg.value = `❌ ${err?.data?.statusMessage || 'Hata'}`
   }
 }
 
@@ -347,7 +352,6 @@ async function logout() {
 }
 
 onMounted(() => {
-  // çerezle giriş yapılmış olabilir
   fetch('/api/poll/current').then(r => r.json()).then(res => {
     if (res?.poll) {
       poll.value = res.poll
@@ -355,6 +359,7 @@ onMounted(() => {
       todayKey.value = res.todayKey
       store.value = res.store
       channelName.value = res.channel?.username || 'SWAGGYBARK'
+      if (res.channel?.avatar) avatar.value = res.channel.avatar
     }
   })
   // oturum çerezi geçerliyse doğrudan panele gir
@@ -430,9 +435,7 @@ onMounted(() => {
 .slot-fields label>span{font-size:11px;color:var(--muted);letter-spacing:.4px}
 .slot-fields .admin-input{width:100%}
 .range-row>span b{color:var(--kick-green)}
-input[type=range]{
-  width:100%;accent-color:var(--kick-green);cursor:pointer;height:18px;
-}
+input[type=range]{width:100%;accent-color:var(--kick-green);cursor:pointer;height:18px}
 .slot-preview{
   margin-top:12px;padding:10px;border:1px dashed var(--border);border-radius:10px;
   background:#0A0D09;text-align:center;

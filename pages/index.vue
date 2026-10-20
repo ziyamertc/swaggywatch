@@ -225,6 +225,13 @@
     </section>
 
     <footer><b>{{ channelName }} • KICK</b> &bull; oylar gece 03:00'da yenilenir &bull; yayın sürerken oylama kapanır, bitince açılır &bull; GLHF 🎮</footer>
+
+    <DeveloperCredit
+      :label="credit?.label"
+      :name="credit?.name"
+      :url="credit?.url"
+      :visible="credit?.visible !== false"
+    />
     </div>
 
     <!-- SAĞ REKLAM ALANI -->
@@ -314,6 +321,9 @@ const slots = computed(() => cur.value?.slots ?? {
   left: { enabled: false, url: '', link: '', title: '', width: 260, radius: 16, opacity: 1 },
   right: { enabled: false, url: '', link: '', title: '', width: 260, radius: 16, opacity: 1 }
 })
+const credit = computed(() => cur.value?.credit ?? {
+  visible: true, label: 'Developed by', name: 'zmchampion', url: 'https://guns.lol/zmchampion'
+})
 
 function slotStyle(s: SlotConfig) {
   return {
@@ -396,6 +406,7 @@ const { connected: liveConnected, transport: liveTransport } = useLiveUpdates((e
       poll: s.poll ?? cur.value.poll,
       question: s.question ?? cur.value.question,
       slots: s.slots ?? cur.value.slots,
+      credit: s.credit ?? cur.value.credit,
       trend: s.trend ?? cur.value.trend,
       live: s.live,
       streamOk: s.streamOk,

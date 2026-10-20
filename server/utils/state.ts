@@ -1,5 +1,5 @@
 import { getPollRaw } from './poll-service.ts'
-import { getQuestion, getSlots } from './settings.ts'
+import { getQuestion, getSlots, getCredit } from './settings.ts'
 import { getStreamStatus } from './kick.ts'
 import { getChannelInfo } from './kick-channel.ts'
 import { dayKeyFor, nextResetIso } from '~/shared/utils/day'
@@ -7,13 +7,14 @@ import { emitPollEvent } from './bus.ts'
 
 /**
  * Panelin tam anlık durumu — WebSocket/SSE ile istemcilere gönderilir.
- * (poll + soru + reklam alanları + trend + yayın durumu)
+ * (poll + soru + reklam alanları + trend + yayın durumu + imza)
  */
 export interface StatePayload {
   type: 'state'
   poll: any
   question: string
   slots: any
+  credit: any
   trend: any[]
   live: boolean
   streamOk: boolean
@@ -25,10 +26,11 @@ export interface StatePayload {
 
 export async function buildState(): Promise<StatePayload> {
   const todayKey = dayKeyFor()
-  const [poll, question, slots, stream, channel] = await Promise.all([
+  const [poll, question, slots, credit, stream, channel] = await Promise.all([
     getPollRaw(todayKey),
     getQuestion(),
     getSlots(),
+    getCredit(),
     getStreamStatus(),
     getChannelInfo()
   ])
@@ -52,6 +54,7 @@ export async function buildState(): Promise<StatePayload> {
     } : null,
     question,
     slots,
+    credit,
     trend,
     live: stream.live,
     streamOk: stream.ok,

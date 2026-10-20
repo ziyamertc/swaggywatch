@@ -110,6 +110,42 @@
         </div>
       </AdminSection>
 
+      <!-- GELİŞTİRİCİ İMZASI -->
+      <AdminSection title="✍️ Geliştirici İmzası" sub="sayfanın en altı" :open="sec.imza" @update:open="v => sec.imza = v">
+        <div class="slot-fields">
+          <label>
+            <span>Ön ek (düz yazı)</span>
+            <input v-model="credit.label" class="admin-input" maxlength="40" placeholder="Developed by">
+          </label>
+          <label>
+            <span>Nickname (parlak yazılır)</span>
+            <input v-model="credit.name" class="admin-input" maxlength="40" placeholder="zmchampion">
+          </label>
+          <label>
+            <span>Tıklanınca gidilecek link</span>
+            <input v-model="credit.url" class="admin-input" maxlength="500" placeholder="https://guns.lol/zmchampion">
+          </label>
+        </div>
+
+        <label class="switch" style="margin-top:12px">
+          <input v-model="credit.visible" type="checkbox">
+          <span>İmzayı göster</span>
+        </label>
+
+        <!-- canlı önizleme -->
+        <div class="credit-preview">
+          <span class="dev-line"></span>
+          <span class="dev-link-preview">
+            <span class="dev-prefix-preview">{{ credit.label || 'Developed by' }}</span>
+            <span class="dev-name-preview">{{ credit.name || 'nickname' }}</span>
+            <span class="dev-arrow-preview">↗</span>
+          </span>
+        </div>
+
+        <button class="ghost btn-ok" style="width:100%;margin-top:12px" @click="saveCredit">💾 İmzayı Kaydet</button>
+        <div v-if="creditMsg" class="vote-note" style="text-align:left" v-html="creditMsg"></div>
+      </AdminSection>
+
       <!-- OYLARI YÖNET -->
       <AdminSection title="🧹 Oyları Yönet" :sub="`bugün ${poll?.yes ?? 0} EVET / ${poll?.no ?? 0} HAYIR`" :open="sec.oylar" @update:open="v => sec.oylar = v">
         <div class="admin-row">
@@ -184,6 +220,13 @@
         <button class="ghost" style="margin-top:14px" @click="refresh">🔄 Yenile</button>
       </AdminSection>
     </template>
+
+    <DeveloperCredit
+      :label="credit.label"
+      :name="credit.name"
+      :url="credit.url"
+      :visible="credit.visible !== false"
+    />
   </div>
 </template>
 
@@ -202,7 +245,7 @@ const votesMsg = ref('')
 const avatar = ref<string | null>(null)
 
 /* Bölümlerin açık/kapalı durumu */
-const sec = reactive({ durum: true, soru: true, log: false, oylar: false, reklam: false, yayin: false })
+const sec = reactive({ durum: true, soru: true, log: false, oylar: false, imza: false, reklam: false, yayin: false })
 const allOpen = ref(false)
 watch(allOpen, (v) => {
   Object.keys(sec).forEach((k) => { (sec as any)[k] = v })
@@ -212,6 +255,8 @@ const slot = reactive({
   left: { enabled: false, url: '', link: '', title: '', width: 260, radius: 16, opacity: 1 },
   right: { enabled: false, url: '', link: '', title: '', width: 260, radius: 16, opacity: 1 }
 })
+const credit = reactive({ visible: true, label: 'Developed by', name: 'zmchampion', url: 'https://guns.lol/zmchampion' })
+const creditMsg = ref('')
 
 const poll = ref<any>(null)
 const live = ref(false)
@@ -271,6 +316,21 @@ async function clearLog() {
     loadLog()
   } catch (err: any) {
     logMsg.value = `❌ ${err?.data?.statusMessage || 'Silinemedi'}`
+  }
+}
+
+async function saveCredit() {
+  try {
+    const res = await $fetch<any>('/api/poll/credit', {
+      method: 'POST',
+      headers: { 'x-admin-key': keyInput.value.trim() },
+      body: { visible: credit.visible, label: credit.label, name: credit.name, url: credit.url }
+    })
+    if (res?.credit) Object.assign(credit, res.credit)
+    creditMsg.value = '✔ İmza kaydedildi — sayfanın en altında anında görünüyor.'
+    refresh()
+  } catch (err: any) {
+    creditMsg.value = `❌ ${err?.data?.statusMessage || 'Yetkisiz / hata'}`
   }
 }
 
@@ -348,6 +408,7 @@ async function refresh() {
       Object.assign(slot.left, res.slots.left)
       Object.assign(slot.right, res.slots.right)
     }
+    if (res.credit) Object.assign(credit, res.credit)
   } catch { /* yok */ }
   if (authed.value) loadLog()
 }
@@ -453,6 +514,27 @@ onMounted(() => {
 .log-action{color:var(--muted);font-size:11.5px;white-space:nowrap}
 .log-note{margin-top:12px;font-size:11.5px;color:var(--muted);line-height:1.6}
 .log-note b{color:#E8B93C}
+
+/* ---------- İmza önizleme (admin) ---------- */
+.credit-preview{
+  margin-top:14px;padding:16px 12px 14px;
+  background:#0A0D09;border:1px dashed var(--border);border-radius:12px;
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+}
+.dev-line{
+  width:120px;height:1px;
+  background:linear-gradient(90deg, transparent, var(--border) 30%, var(--border) 70%, transparent);
+}
+.dev-link-preview{display:inline-flex;align-items:center;gap:8px;font-family:'Chakra Petch',sans-serif}
+.dev-prefix-preview{font-size:11px;letter-spacing:2.6px;text-transform:uppercase;color:#4A5C42}
+.dev-name-preview{
+  font-size:14px;font-weight:700;letter-spacing:1.4px;
+  background:linear-gradient(92deg, #53FC18 0%, #B6FF8E 45%, #EFFFEA 100%);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;color:transparent;
+  text-shadow:0 0 18px rgba(83,252,24,.28);
+}
+.dev-arrow-preview{font-size:10px;color:#4A5C42}
 
 /* ---------- Slot editörü ---------- */
 .slot-editor{

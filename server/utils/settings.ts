@@ -109,3 +109,46 @@ export async function setSlot(side: SlotSide, config: Partial<SlotConfig>): Prom
   await setSetting(`slot_${side}`, JSON.stringify(clean))
   return clean
 }
+
+/* ---------------- Geliştirici imzası (alt bilgi) ---------------- */
+
+export interface CreditConfig {
+  visible: boolean
+  label: string   // "Developed by"
+  name: string    // "zmchampion" (parlak yazılır)
+  url: string     // tıklanınca gidilecek adres
+}
+
+export const DEFAULT_CREDIT: CreditConfig = {
+  visible: true,
+  label: 'Developed by',
+  name: 'zmchampion',
+  url: 'https://guns.lol/zmchampion'
+}
+
+export async function getCredit(): Promise<CreditConfig> {
+  try {
+    const raw = await getSetting('credit', '')
+    if (!raw) return { ...DEFAULT_CREDIT }
+    const c = JSON.parse(raw)
+    return {
+      visible: c.visible !== false,
+      label: String(c.label ?? DEFAULT_CREDIT.label).slice(0, 40),
+      name: String(c.name ?? DEFAULT_CREDIT.name).slice(0, 40),
+      url: String(c.url ?? DEFAULT_CREDIT.url).slice(0, 500)
+    }
+  } catch {
+    return { ...DEFAULT_CREDIT }
+  }
+}
+
+export async function setCredit(config: Partial<CreditConfig>): Promise<CreditConfig> {
+  const clean: CreditConfig = {
+    visible: config.visible !== false,
+    label: String(config.label ?? DEFAULT_CREDIT.label).slice(0, 40),
+    name: String(config.name ?? DEFAULT_CREDIT.name).slice(0, 40),
+    url: String(config.url ?? DEFAULT_CREDIT.url).slice(0, 500)
+  }
+  await setSetting('credit', JSON.stringify(clean))
+  return clean
+}

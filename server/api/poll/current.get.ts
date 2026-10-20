@@ -1,5 +1,5 @@
 import { activeStoreMode, getSnapshots } from '../../utils/poll-service'
-import { getQuestion, getSlots } from '../../utils/settings'
+import { getQuestion, getSlots, getCredit } from '../../utils/settings'
 import { getLastDbError } from '../../utils/db'
 import { syncPollWithStream } from '../../utils/poll-state'
 import { getStreamStatus } from '../../utils/kick'
@@ -42,6 +42,7 @@ export default defineEventHandler(async () => {
     channel: await getChannelInfo(),
     question: await getQuestion(),
     slots: await getSlots(),
+    credit: await getCredit(),
     trend: await getSnapshots(todayKey),
     todayKey,
     nextReset: nextResetIso(),

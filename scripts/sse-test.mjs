@@ -35,7 +35,8 @@ setTimeout(async () => {
   console.log('🗳  oy gönderildi (t=' + (Date.now() - t0) + 'ms)')
 }, 1000)
 
-while (messages.length < 3 && Date.now() - t0 < 15000) {
+// 'vote' olayını görene kadar bekle (mesaj sayısıyla değil)
+while (!messages.some(m => m.type === 'vote') && Date.now() - t0 < 20000) {
   const { value, done } = await reader.read()
   if (done) break
   buffer += decoder.decode(value, { stream: true })

@@ -110,6 +110,25 @@
         </div>
       </AdminSection>
 
+      <!-- KEEP-ALIVE (site uyanık mı?) -->
+      <AdminSection title="🩺 Site Uyanıklığı" :sub="kaSub" :open="sec.keepalive" @update:open="v => sec.keepalive = v">
+        <div class="ka-grid">
+          <div><b>{{ keepAlive.enabled ? '✅' : '⚠️' }}</b><span>keep-alive</span></div>
+          <div><b>{{ keepAlive.pingCount }}</b><span>ping sayısı</span></div>
+          <div><b>{{ keepAlive.lastStatus || '—' }}</b><span>son HTTP</span></div>
+          <div><b>{{ kaAgo }}</b><span>son ping</span></div>
+        </div>
+        <div class="ai-admin-note" v-if="keepAlive.baseUrl">
+          Hedef: <b>{{ keepAlive.baseUrl }}</b>
+        </div>
+        <div class="ai-admin-note" v-else>
+          ⚠️ Public adres tanımlı değil. Render otomatik verir; başka host'ta
+          <b>PUBLIC_SITE_URL</b> veya <b>KEEPALIVE_URL</b> ortam değişkenini tanımla.
+        </div>
+        <div v-if="keepAlive.lastError" class="ai-admin-note" style="color:#FF8AA3">Son hata: {{ keepAlive.lastError }}</div>
+        <button class="ghost" style="margin-top:12px;width:100%" @click="pingNow">📡 Şimdi ping at</button>
+      </AdminSection>
+
       <!-- GELİŞTİRİCİ İMZASI -->
       <AdminSection title="✍️ Geliştirici İmzası" sub="sayfanın en altı" :open="sec.imza" @update:open="v => sec.imza = v">
         <div class="slot-fields">
@@ -245,7 +264,40 @@ const votesMsg = ref('')
 const avatar = ref<string | null>(null)
 
 /* Bölümlerin açık/kapalı durumu */
-const sec = reactive({ durum: true, soru: true, log: false, oylar: false, imza: false, reklam: false, yayin: false })
+const sec = reactive({ durum: true, soru: true, log: false, oylar: false, imza: false, reklam: false, yayin: false, keepalive: false })
+const keepAlive = reactive<any>({ enabled: false, baseUrl: null, lastPingAt: null, lastStatus: null, lastResult: null, lastError: null, pingCount: 0 })
+const nowTs = ref(Date.now())
+setInterval(() => { nowTs.value = Date.now() }, 10000)
+
+const kaSub = computed(() => {
+  if (!keepAlive.enabled) return 'public adres yok'
+  if (!keepAlive.lastPingAt) return 'ilk ping bekleniyor'
+  return `${kaAgo.value} önce ping`
+})
+
+const kaAgo = computed(() => {
+  if (!keepAlive.lastPingAt) return '—'
+  const diff = Math.max(0, Math.round((nowTs.value - new Date(keepAlive.lastPingAt).getTime()) / 1000))
+  if (diff < 60) return `${diff} sn`
+  if (diff < 3600) return `${Math.round(diff / 60)} dk`
+  return `${Math.round(diff / 3600)} sa`
+})
+
+async function loadKeepAlive() {
+  try {
+    const s: any = await $fetch('/api/keepalive')
+    Object.assign(keepAlive, s)
+  } catch { /* yoksay */ }
+}
+
+async function pingNow() {
+  try {
+    const s: any = await $fetch('/api/keepalive', { method: 'POST' })
+    Object.assign(keepAlive, s)
+  } catch (err: any) {
+    keepAlive.lastError = err?.data?.statusMessage || 'ping başarısız'
+  }
+}
 const allOpen = ref(false)
 watch(allOpen, (v) => {
   Object.keys(sec).forEach((k) => { (sec as any)[k] = v })
@@ -410,7 +462,7 @@ async function refresh() {
     }
     if (res.credit) Object.assign(credit, res.credit)
   } catch { /* yok */ }
-  if (authed.value) loadLog()
+  if (authed.value) { loadLog(); loadKeepAlive() }
 }
 
 async function control(action: 'open' | 'close' | 'auto') {
@@ -535,6 +587,15 @@ onMounted(() => {
   text-shadow:0 0 18px rgba(83,252,24,.28);
 }
 .dev-arrow-preview{font-size:10px;color:#4A5C42}
+
+/* ---------- Keep-alive (admin) ---------- */
+.ka-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
+.ka-grid > div{
+  background:#0D120B;border:1px solid var(--border);border-radius:9px;padding:8px 10px;
+  display:flex;flex-direction:column;gap:2px;
+}
+.ka-grid b{font-family:'Chakra Petch',sans-serif;font-size:17px;color:var(--text)}
+.ka-grid span{font-size:10px;color:var(--muted);letter-spacing:.3px}
 
 /* ---------- Slot editörü ---------- */
 .slot-editor{

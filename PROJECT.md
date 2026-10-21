@@ -108,6 +108,7 @@ npm run simulate:votes   # sahte oylar üret (trend testi)
 | Güven aralığı | `±30%` yerine **"Düşük/Orta/Yüksek"** kelimesi | İstatistiksel ifade anlaşılmıyordu |
 | Vite/Netlify | `render.yaml` + `Dockerfile` hazır, `netlify.toml` da var | Esneklik |
 | Deno Deploy | Denedim → ücretsiz planda **aylık 10 saat aktif CPU** sınırı, 24/7 panel için yetersiz | Kota nedeniyle askıya alındı |
+| Site uyanıklığı | **Nitro scheduled task** `poll:keepalive` → **5 dk'da bir** kendi public adresine ping (`RENDER_EXTERNAL_URL` otomatik gelir). Dışarıdan cron kurmaya gerek yok — Render cron job'ları aylık $1 + kart istiyor | Admin → "🩺 Site Uyanıklığı" bölümünden ping sayısını/son pingi görebilirsin |
 
 ---
 

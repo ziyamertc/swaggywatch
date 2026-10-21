@@ -31,7 +31,10 @@ export function toDTO(p: PollDocument | MemPoll): PollDTO {
   }
 }
 
-export type VoteResult = 'added' | 'changed' | 'unchanged' | 'closed' | 'locked'
+export type VoteResult = 'added' | 'changed' | 'unchanged' | 'closed' | 'locked' | 'capped'
+
+/** Aynı IP'den (CGNAT) gelen en fazla oy sayısı — kötüye kullanım sınırı. */
+export const MAX_VOTES_PER_IP = 8
 
 export const storeMode = (): 'mongo' | 'memory' => (mongoConfigured ? 'mongo' : 'memory')
 
@@ -124,13 +127,24 @@ export async function getPollRaw(dayKey: string): Promise<PollDTO | MemPoll | nu
 export async function castVote(
   dayKey: string,
   hash: string,
-  choice: 'yes' | 'no'
+  choice: 'yes' | 'no',
+  ipHashValue?: string
 ): Promise<{ poll: PollDTO | null; result: VoteResult }> {
   const raw = await getPollRaw(dayKey)
   if (!raw) return { poll: null, result: 'closed' }
   if (raw.status !== 'active') return { poll: toDTO(raw), result: 'closed' }
 
   const Model = await getPollModel()
+  const votes = (raw as any).votes || []
+
+  // 🛡️ IP başına sınır (CGNAT'ta çok kişi aynı IP'den gelir; sadece kötüye
+  // kullanımı engellemek için, normal izleyiciyi engellememek adına yüksek tutulur)
+  if (ipHashValue) {
+    const sameIp = votes.filter((v: any) => v.ip === ipHashValue).length
+    if (sameIp >= MAX_VOTES_PER_IP && !votes.some((v: any) => v.h === hash)) {
+      return { poll: toDTO(raw), result: 'capped' }
+    }
+  }
 
   if (!Model) {
     const p = raw as MemPoll
@@ -146,7 +160,7 @@ export async function castVote(
       existing.changeUntil = null
       return { poll: toDTO(p), result: 'changed' }
     }
-    p.votes.push({ h: hash, c: choice, at: new Date() })
+    p.votes.push({ h: hash, c: choice, at: new Date(), ip: ipHashValue })
     p[choice]++
     return { poll: toDTO(p), result: 'added' }
   }
@@ -171,14 +185,14 @@ export async function castVote(
 
   const updated = await Model.findOneAndUpdate(
     { dayKey, votes: { $not: { $elemMatch: { h: hash } } } },
-    { $push: { votes: { h: hash, c: choice, at: new Date(), changeUntil: null } }, $inc: { [choice]: 1 } },
+    { $push: { votes: { h: hash, c: choice, at: new Date(), changeUntil: null, ip: ipHashValue } }, $inc: { [choice]: 1 } },
     { new: true, lean: true }
   ).lean<PollDocument>()
 
   if (!updated) {
     // eşzamanlı istek olabilir → tekrar dene
     const again = await getPollRaw(dayKey)
-    if (again && again.status === 'active') return castVote(dayKey, hash, choice)
+    if (again && again.status === 'active') return castVote(dayKey, hash, choice, ipHashValue)
     return { poll: again ? toDTO(again as PollDocument) : null, result: 'closed' }
   }
   return { poll: toDTO(updated), result: 'added' }

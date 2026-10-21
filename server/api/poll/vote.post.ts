@@ -37,9 +37,17 @@ export default defineEventHandler(async (event) => {
     title: stream.title
   })
 
-  const { poll, result } = await castVote(todayKey, ipHash(event), choice)
+  // Birincil kimlik: cihaz (UUID) → IP sadece kötüye kullanım sınırı için
+  const { poll, result } = await castVote(todayKey, voterHash(event), choice, ipHash(event))
   if (!poll) {
     throw createError({ statusCode: 409, statusMessage: 'Oylama kapalı, oy kaydedilmedi' })
+  }
+
+  if (result === 'capped') {
+    throw createError({
+      statusCode: 429,
+      statusMessage: 'Bu bağlantıdan oy sınırına ulaşıldı. Lütfen biraz sonra tekrar dene.'
+    })
   }
 
   if (result === 'closed') {

@@ -55,7 +55,7 @@ scripts/*.mjs              → test ve bakım araçları
 | Kural | Detay |
 |---|---|
 | Gün döngüsü | **TSİ 03:00**'te yeni gün. 00:00–02:59 hâlâ önceki gün sayılır. `shared/utils/day.ts` tek kaynak. |
-| Günde 1 oy | IP → HMAC-SHA256 (`VOTE_SECRET`) ile kimlik. Ham IP **sadece** admin logunda tutulur. |
+| Günde 1 oy | **Cihaz kimliği** (tarayıcıdaki rastgele UUID, sunucuda HMAC-SHA256 ile özetlenir). IP sadece **kötüye kullanım sınırı** (8 oy/IP) için. ⚠️ IP'ye göre kural **kötüydü**: Türkiye'deki mobil operatörler (CGNAT) yüzlerce aboneyi tek IP'den çıkarıyor, telefondan oy atan izleyicilerin çoğu engelleniyordu. |
 | Oyu değiştirme | Oy sonrası **20 sn** "Oyumu Değiştir" butonu, basınca **10 sn** değiştirme penceresi. Zamanlama **sunucuda** (`/api/poll/me`) — kilitlenme olmaz. |
 | Yayın kapama | Kick'te yayın açıksa oylama `closed_stream` olur; yayın bitince **otomatik açılır**. |
 | Otomatik mod | Admin → 🤖 Otomatik → yayın durumuna göre kendi kararını verir. |

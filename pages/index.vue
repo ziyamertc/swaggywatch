@@ -397,11 +397,13 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKey)
 })
 
+/* ---------------- Cihaz kimliği (CGNAT-safe oy) ---------------- */
+const { header: cidHeader } = useClientId()
+
 /* ---------------- Anlık güncelleme (WebSocket + SSE) + uçuşan +1 ---------------- */
 const { floats, push: pushFloat } = useVoteFloats()
 
-const { connected: liveConnected, transport: liveTransport } = useLiveUpdates((evt: any) => {
-  // WebSocket tam durum gönderir → her şey anında güncellenir (F5 gerekmez)
+const { connected: liveConnected, transport: liveTransport } = useLiveUpdates((evt: any) => {  // WebSocket tam durum gönderir → her şey anında güncellenir (F5 gerekmez)
   if (evt.state && cur.value) {
     const s = evt.state
     cur.value = {
@@ -669,6 +671,7 @@ async function vote(choice: 'yes' | 'no') {
   try {
     const res: any = await $fetch<{ ok: boolean; result: string; poll: PollDTO }>('/api/poll/vote', {
       method: 'POST',
+      headers: { ...cidHeader.value },
       body: { choice }
     })
     poll.value = res.poll

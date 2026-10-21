@@ -157,6 +157,7 @@ onMounted(() => {
 
 /* ---------------- Anlık güncelleme (WebSocket + SSE) + uçuşan +1 ---------------- */
 const { floats, push: pushFloat } = useVoteFloats()
+const { header: cidHeader } = useClientId()
 const livePoll = ref<PollDTO | null>(null)
 
 useLiveUpdates((evt: any) => {
@@ -188,7 +189,7 @@ watch(() => cur.value?.channel?.avatar, v => { if (v) avatar.value = v })
 async function vote(choice: 'yes' | 'no') {
   if (!canVote.value) return
   try {
-    const res: any = await $fetch('/api/poll/vote', { method: 'POST', body: { choice } })
+    const res: any = await $fetch('/api/poll/vote', { method: 'POST', headers: { ...cidHeader.value }, body: { choice } })
     if (res?.poll) {
       await loadMe()
     }

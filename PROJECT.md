@@ -111,27 +111,24 @@ npm run simulate:votes   # sahte oylar üret (trend testi)
 
 ---
 
-## 🚧 YAPILACAKLAR (devam eden iş)
+## 🚀 YAPILACAKLAR
 
-### 1. 🤖 AI Yayın Tahmini (şu an yapılıyor)
-**Hedef:** Panelin solunda topluluk beklentisi, sağında **yapay zeka yayın tahmini**.
+### 1. 🤖 AI Yayın Tahmini — ❌ RAFA KALDIRILDI (2026-10-20)
 
-**Veri kaynağı:** Kick VOD API'si → geçmiş yayın günleri.
-**Mevcut gerçek veri (8 benzersiz yayın günü):** 24 Eyl, 29 Eyl, 1 Eki, 4 Eki, 10 Eki, 11 Eki, 14 Eki, 19 Eki
-**Aralıklar:** 5, 2, 3, 6, 1, 3, 5 gün → ortalama 3,6 gün, medyan 3 gün
-**Saat eğilimi:** 12:21 → 22:35 arası kaymış, son haftalarda akşam 19:00+
+Fikir: "Swaggybark bugün yayın açacak mı?" sorusunu **matematiksel** cevaplamak.
+Panelin solunda topluluk beklentisi, sağında yapay zeka tahmini olacaktı.
 
-**Model:** Discrete hazard (hayatta kalma analizi) + haftanın günü ağırlığı
-```
-P(yayın | g) = h(g) = (g tam aralıklı yayınlar + α) / (g+ aralıklı yayınlar + α)   [α=0.5]
-P(gün t) = [Π (1-h(k))] × h(t) × w(hAFTANIN GÜNÜ)
-```
-**Backtest şart:** walk-forward doğrulama → Brier skoru + kalibrasyon, panelde "isabet oranı" olarak gösterilir.
+**Yapılanlar (prototip çalıştı, sonra geri alındı):**
+- Kick VOD API'sinden geçmiş yayın günleri çekilebiliyor (`/api/v2/channels/{slug}/videos`)
+- Gerçek veri: 8 benzersiz yayın günü (24 Eyl – 19 Eki), aralıklar 5,2,3,6,1,3,5 gün → ortalama 3,6 gün
+- Model: **discrete hazard** (hayatta kalma analizi) + haftanın günü ağırlığı + tempel orana kalibrasyon
+- Backtest (walk-forward): Brier 0,219, isabet %73
 
-**Fazlar:**
-1. `streams` tablosu + VOD backfill + saatlik güncelleme görevi
-2. Model + backtest + API + panel kartı
-3. Admin: "Kesin yayın" / "İptal" manuel işareti (model duyuruları bilemez)
+**Neden yapılmadı:** 8 gözlem çok az — model istatistiksel olarak anlamsız (güven "düşük").
+Veri biriktikçe (VOD listesi sınırlı, 12 kayıt) tekrar denenebilir.
+
+**Not:** Geçmiş veri eksikliğinin çözümü = her gün otomatik "yayında mıydı?" kaydı
+(`streams` koleksiyonu) + saatlik görev. Model kodu silindi, gerekirse yeniden yazılır.
 
 ### 2. Sonraki fikirler
 - Anket modu (3-4 seçenek)

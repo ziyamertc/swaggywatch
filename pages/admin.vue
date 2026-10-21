@@ -27,8 +27,14 @@
       <div v-if="msg" class="vote-note" style="text-align:left" v-html="msg"></div>
     </section>
 
-    <!-- kontrol paneli -->
-    <template v-else>
+    <!-- bakım modu aktifken uyarı (kontrol paneliyle AYRI v-if) -->
+    <div v-if="authed && maint.enabled" class="maint-active-banner">
+      🔧 <b>Bakım modu AÇIK</b> — ziyaretçilere kepenk iniyor.
+      <span>Bu panel her zaman erişilebilir (kilitlenmemek için).</span>
+    </div>
+
+    <!-- kontrol paneli (v-else DEĞİL — yukarıdaki uyarı v-if'iyle zincir kırılmasın) -->
+    <template v-if="authed">
       <!-- OYLAMA DURUMU -->
       <AdminSection title="📺 Oylama Durumu" :sub="pollStatusText" :open="sec.durum" @update:open="v => sec.durum = v">
         <div class="stat-row" style="margin-bottom:16px">
@@ -112,11 +118,9 @@
 
       <!-- BAKIM MODU (KEPENEK) -->
       <AdminSection title="🔧 Bakım Modu (Kepenk)" :sub="maint.enabled ? 'AÇIK — kepenk iniyor' : 'kapalı'" :open="sec.bakim" @update:open="v => sec.bakim = v">
-        <div class="maint-toggle-row">
-          <label class="switch">
-            <input v-model="maint.enabled" type="checkbox">
-            <span>{{ maint.enabled ? 'BAKIM MODU AÇIK' : 'Bakım modu kapalı' }}</span>
-          </label>
+        <div class="maint-state" :class="{ on: maint.enabled }">
+          <span class="maint-state-dot"></span>
+          Şu an: <b>{{ maint.enabled ? 'BAKIM MODU AÇIK' : 'kapalı (site normal)' }}</b>
         </div>
 
         <div class="slot-fields" style="margin-top:12px">
@@ -127,7 +131,8 @@
         </div>
 
         <div class="admin-row" style="margin-top:12px">
-          <button class="ghost btn-warn" @click="toggleMaint">💾 {{ maint.enabled ? 'Kapat' : 'Bakıma Al' }}</button>
+          <button class="ghost btn-warn" @click="setMaint(true)">🔧 Bakıma Al</button>
+          <button class="ghost btn-ok" @click="setMaint(false)">✅ Siteyi Aç</button>
           <button class="ghost" @click="previewMaint = !previewMaint">{{ previewMaint ? 'Önizlemeyi kapat' : '👁 Önizle' }}</button>
         </div>
         <div v-if="maintMsg" class="vote-note" style="text-align:left" v-html="maintMsg"></div>
@@ -326,15 +331,15 @@ const kaAgo = computed(() => {
   return `${Math.round(diff / 3600)} sa`
 })
 
-async function toggleMaint() {
+async function setMaint(enabled: boolean) {
   try {
     const res: any = await $fetch('/api/poll/maintenance', {
       method: 'POST',
       headers: { 'x-admin-key': keyInput.value.trim() },
-      body: { enabled: maint.enabled, message: maint.message }
+      body: { enabled, message: maint.message }
     })
     if (res?.maintenance) Object.assign(maint, res.maintenance)
-    maintMsg.value = maint.enabled
+    maintMsg.value = enabled
       ? '🔧 Bakım modu açıldı — kepenk tüm sayfalarda iniyor.'
       : '✅ Bakım modu kapatıldı — site normale döndü.'
     previewMaint.value = false
@@ -666,7 +671,26 @@ onMounted(() => {
 .ka-grid span{font-size:10px;color:var(--muted);letter-spacing:.3px}
 
 /* ---------- Bakım modu (admin) ---------- */
+.maint-active-banner{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  background:rgba(232,185,60,.09);border:1px solid rgba(232,185,60,.38);
+  border-radius:12px;padding:12px 16px;font-size:13px;color:#E8C66B;
+}
+.maint-active-banner b{color:#F0D07A}
+.maint-active-banner span{color:var(--muted);font-size:12px}
 .maint-toggle-row{display:flex;align-items:center;gap:10px}
+.maint-state{
+  display:flex;align-items:center;gap:9px;
+  background:#0D120B;border:1px solid var(--border);border-radius:10px;
+  padding:10px 14px;font-size:13px;color:var(--muted);
+}
+.maint-state b{color:var(--text)}
+.maint-state.on{border-color:rgba(232,185,60,.45);color:#E8C66B}
+.maint-state.on b{color:#F0D07A}
+.maint-state-dot{
+  width:8px;height:8px;border-radius:50%;background:#4A5C42;
+}
+.maint-state.on .maint-state-dot{background:#E8B93C;box-shadow:0 0 10px rgba(232,185,60,.8)}
 .maint-preview{
   margin-top:14px;border-radius:14px;overflow:hidden;position:relative;
   background:

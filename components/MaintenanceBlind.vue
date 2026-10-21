@@ -30,6 +30,8 @@
                 <span class="spinner"></span> birazdan dönüyoruz
               </span>
             </div>
+
+            <NuxtLink to="/admin" class="rail-admin-hint">Yayıncı girişi → /admin</NuxtLink>
           </div>
         </div>
       </div>
@@ -58,7 +60,16 @@ async function load() {
   } catch { /* yoksay */ }
 }
 
-const visible = computed(() => maintenance.value?.enabled === true)
+const visible = computed(() =>
+  maintenance.value?.enabled === true && !isAdminPage.value
+)
+
+/**
+ * /admin sayfası kepenkten MUAF: aksi hâlde bakım modunu açan kişi
+ * kendini kilitler, kapatamaz. Admin paneli her zaman erişilebilir kalmalı.
+ */
+const route = useRoute()
+const isAdminPage = computed(() => (route.path || '').startsWith('/admin'))
 
 watch(visible, (v) => {
   if (v) {
@@ -81,7 +92,8 @@ const elapsed = computed(() => {
 
 onMounted(() => {
   load()
-  const t = setInterval(load, 15_000)
+  // WS anında haber verir; bu yoksa en geç 8 sn'de bir kontrol eder
+  const t = setInterval(load, 8_000)
   const tick = setInterval(() => { now.value = Date.now() }, 1000)
   onBeforeUnmount(() => { clearInterval(t); clearInterval(tick) })
 })
@@ -192,4 +204,11 @@ onMounted(() => {
   .rail{min-height:240px;padding:28px 16px 34px}
   .rail-title{letter-spacing:4px}
 }
+
+.rail-admin-hint{
+  display:inline-block;margin-top:18px;
+  font-size:11px;color:#4A5C42;text-decoration:none;
+  letter-spacing:.8px;transition:color .2s;
+}
+.rail-admin-hint:hover{color:#6E8A62;text-decoration:underline}
 </style>

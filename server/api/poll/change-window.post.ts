@@ -1,5 +1,5 @@
 import { openChangeWindow } from '../../utils/poll-service'
-import { ipHash } from '../../utils/hash'
+import { voterHash } from '../../utils/hash'
 import { dayKeyFor } from '~/shared/utils/day'
 
 /**
@@ -10,7 +10,8 @@ import { dayKeyFor } from '~/shared/utils/day'
  */
 export default defineEventHandler(async (event) => {
   const todayKey = dayKeyFor()
-  const { until, poll } = await openChangeWindow(todayKey, ipHash(event), 10)
+  // Oyuncu kimliği cihaza bağlı (IP değil) — oyla aynı hash kullanılmalı
+  const { until, poll } = await openChangeWindow(todayKey, voterHash(event), 10)
 
   if (!until) {
     throw createError({

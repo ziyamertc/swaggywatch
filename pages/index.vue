@@ -165,13 +165,22 @@
       </div>
 
       <div v-if="voteNote" class="vote-note" v-html="voteNote"></div>
+      <div v-if="voteError" class="vote-error">⚠️ <span v-html="voteError"></span></div>
 
       <!-- Oy değiştirme butonu (20 sn basma penceresi) -->
-      <div class="change-row" v-if="myChoice && votingOpen && pressWindowOpen">
+      <div class="change-row" v-if="myChoice && votingOpen && (pressWindowOpen || changeWindowOpen)">
         <button class="ghost btn-change" @click="openChangeWindow" :disabled="changeWindowOpen">
           <template v-if="changeWindowOpen">⏳ Değiştir: {{ changeSecondsLeft }} sn</template>
           <template v-else>✏️ Oyumu Değiştir ({{ pressSecondsLeft }} sn)</template>
         </button>
+      </div>
+
+      <!-- oy verildi ama değiştirme penceresi kapandıysa bilgi -->
+      <div class="change-row" v-else-if="myChoice && votingOpen">
+        <span class="change-info">
+          Oyun kaydedildi. Değiştirmek için oy verdiğin andan itibaren 20 sn içinde
+          "Oyumu Değiştir" butonu aktif olur.
+        </span>
       </div>
 
       <div class="reset-note">⏰ Sonraki yeni gün oylaması: {{ countdown }}</div>
@@ -441,6 +450,7 @@ const votingOpen = computed(() =>
   !!poll.value && poll.value.status === 'active' && poll.value.dayKey === clientDayKey.value
 )
 const myChoice = computed(() => me.value?.choice ?? null)
+const voteError = ref('')
 
 // Değiştirme penceresi (sunucu 10 sn) açık mı?
 const changeWindowOpen = computed(() => (me.value?.changeUntil ?? 0) > nowTs.value)
@@ -675,16 +685,21 @@ async function vote(choice: 'yes' | 'no') {
       body: { choice }
     })
     poll.value = res.poll
+    voteError.value = ''
     // oy durumu sunucudan tazele (buton penceresi, değiştirme penceresi)
     await loadMe()
     addRipple(choice === 'yes' ? btnYesEl.value : btnNoEl.value)
     await refreshCur()
     await refreshHist()
   } catch (err: any) {
-    if (String(err?.status ?? err?.statusCode) === '409') {
+    const code = String(err?.status ?? err?.statusCode)
+    const msg = err?.data?.statusMessage || err?.statusMessage || ''
+    if (code === '409' || code === '429') {
+      voteError.value = msg
       await refreshCur()
     } else {
-      console.error('Oy hatası:', err?.data?.statusMessage || err)
+      console.error('Oy hatası:', msg || err)
+      voteError.value = 'Oy kaydedilemedi. Biraz sonra tekrar dene.'
     }
   }
 }

@@ -110,6 +110,46 @@
         </div>
       </AdminSection>
 
+      <!-- BAKIM MODU (KEPENEK) -->
+      <AdminSection title="🔧 Bakım Modu (Kepenk)" :sub="maint.enabled ? 'AÇIK — kepenk iniyor' : 'kapalı'" :open="sec.bakim" @update:open="v => sec.bakim = v">
+        <div class="maint-toggle-row">
+          <label class="switch">
+            <input v-model="maint.enabled" type="checkbox">
+            <span>{{ maint.enabled ? 'BAKIM MODU AÇIK' : 'Bakım modu kapalı' }}</span>
+          </label>
+        </div>
+
+        <div class="slot-fields" style="margin-top:12px">
+          <label>
+            <span>Kepenkte yazacak mesaj</span>
+            <input v-model="maint.message" class="admin-input" maxlength="200" placeholder="Kısa bir mola — birazdan buradayız.">
+          </label>
+        </div>
+
+        <div class="admin-row" style="margin-top:12px">
+          <button class="ghost btn-warn" @click="toggleMaint">💾 {{ maint.enabled ? 'Kapat' : 'Bakıma Al' }}</button>
+          <button class="ghost" @click="previewMaint = !previewMaint">{{ previewMaint ? 'Önizlemeyi kapat' : '👁 Önizle' }}</button>
+        </div>
+        <div v-if="maintMsg" class="vote-note" style="text-align:left" v-html="maintMsg"></div>
+
+        <!-- Kepenk önizleme -->
+        <div v-if="previewMaint" class="maint-preview">
+          <div class="maint-preview-inner">
+            <div class="rail-top">
+              <span class="rail-dot"></span>
+              <span class="rail-label">SİSTEM BAKIMDA</span>
+              <span class="rail-dot"></span>
+            </div>
+            <div class="rail-title">BAKIMDAYIZ</div>
+            <p class="rail-msg">{{ maint.message || 'Kısa bir mola — birazdan buradayız.' }}</p>
+            <div class="rail-meta">
+              <span class="rail-chip">🔧 SWAGGYBARK</span>
+              <span class="rail-chip pulse-chip"><span class="spinner"></span> birazdan dönüyoruz</span>
+            </div>
+          </div>
+        </div>
+      </AdminSection>
+
       <!-- KEEP-ALIVE (site uyanık mı?) -->
       <AdminSection title="🩺 Site Uyanıklığı" :sub="kaSub" :open="sec.keepalive" @update:open="v => sec.keepalive = v">
         <div class="ka-grid">
@@ -264,7 +304,10 @@ const votesMsg = ref('')
 const avatar = ref<string | null>(null)
 
 /* Bölümlerin açık/kapalı durumu */
-const sec = reactive({ durum: true, soru: true, log: false, oylar: false, imza: false, reklam: false, yayin: false, keepalive: false })
+const sec = reactive({ durum: true, soru: true, log: false, oylar: false, imza: false, reklam: false, yayin: false, keepalive: false, bakim: false })
+const maint = reactive({ enabled: false, message: 'Kısa bir mola — birazdan buradayız.' })
+const maintMsg = ref('')
+const previewMaint = ref(false)
 const keepAlive = reactive<any>({ enabled: false, baseUrl: null, lastPingAt: null, lastStatus: null, lastResult: null, lastError: null, pingCount: 0 })
 const nowTs = ref(Date.now())
 setInterval(() => { nowTs.value = Date.now() }, 10000)
@@ -282,6 +325,31 @@ const kaAgo = computed(() => {
   if (diff < 3600) return `${Math.round(diff / 60)} dk`
   return `${Math.round(diff / 3600)} sa`
 })
+
+async function toggleMaint() {
+  try {
+    const res: any = await $fetch('/api/poll/maintenance', {
+      method: 'POST',
+      headers: { 'x-admin-key': keyInput.value.trim() },
+      body: { enabled: maint.enabled, message: maint.message }
+    })
+    if (res?.maintenance) Object.assign(maint, res.maintenance)
+    maintMsg.value = maint.enabled
+      ? '🔧 Bakım modu açıldı — kepenk tüm sayfalarda iniyor.'
+      : '✅ Bakım modu kapatıldı — site normale döndü.'
+    previewMaint.value = false
+    refresh()
+  } catch (err: any) {
+    maintMsg.value = `❌ ${err?.data?.statusMessage || 'Yetkisiz / hata'}`
+  }
+}
+
+async function loadMaint() {
+  try {
+    const r: any = await $fetch('/api/poll/maintenance')
+    if (r?.maintenance) Object.assign(maint, r.maintenance)
+  } catch { /* yoksay */ }
+}
 
 async function loadKeepAlive() {
   try {
@@ -462,7 +530,7 @@ async function refresh() {
     }
     if (res.credit) Object.assign(credit, res.credit)
   } catch { /* yok */ }
-  if (authed.value) { loadLog(); loadKeepAlive() }
+  if (authed.value) { loadLog(); loadKeepAlive(); loadMaint() }
 }
 
 async function control(action: 'open' | 'close' | 'auto') {
@@ -596,6 +664,48 @@ onMounted(() => {
 }
 .ka-grid b{font-family:'Chakra Petch',sans-serif;font-size:17px;color:var(--text)}
 .ka-grid span{font-size:10px;color:var(--muted);letter-spacing:.3px}
+
+/* ---------- Bakım modu (admin) ---------- */
+.maint-toggle-row{display:flex;align-items:center;gap:10px}
+.maint-preview{
+  margin-top:14px;border-radius:14px;overflow:hidden;position:relative;
+  background:
+    linear-gradient(180deg,#232c1f 0%,#1a2118 38%,#0f140e 100%);
+  border:1px solid var(--border);
+  min-height:220px;display:flex;align-items:flex-end;
+}
+.maint-preview::before{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(180deg, rgba(0,0,0,.28) 0 22px, transparent 22px 24px);
+  pointer-events:none;
+}
+.maint-preview-inner{
+  position:relative;width:100%;text-align:center;padding:26px 18px 24px;
+  background:linear-gradient(180deg, rgba(7,10,6,0) 0%, rgba(7,10,6,.92) 45%, #070a06 100%);
+  border-top:2px solid var(--kick-green);
+}
+.maint-preview .rail-title{font-size:clamp(26px,5vw,42px);letter-spacing:5px;margin-bottom:10px}
+.maint-preview .rail-msg{font-size:12.5px;margin-bottom:14px}
+.maint-preview .rail-chip{font-size:11px;padding:5px 12px}
+.rail-top{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px}
+.rail-dot{width:6px;height:6px;border-radius:50%;background:var(--kick-green);box-shadow:0 0 10px rgba(83,252,24,.9);animation:blink 1.6s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.rail-label{font-family:'Chakra Petch',sans-serif;font-size:9.5px;font-weight:600;letter-spacing:3.6px;color:#6E8A62}
+.rail-title{
+  font-family:'Chakra Petch',sans-serif;font-weight:700;letter-spacing:6px;line-height:1;
+  color:#EFFFEA;text-shadow:0 0 10px rgba(83,252,24,.55),0 0 30px rgba(83,252,24,.3);
+  margin:0 0 12px;
+}
+.rail-msg{font-size:13px;color:#A8BFA0;margin:0 0 16px;line-height:1.5}
+.rail-meta{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.rail-chip{
+  display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#8CA184;
+  background:rgba(20,26,16,.85);border:1px solid rgba(83,252,24,.22);
+  border-radius:999px;padding:5px 12px;
+}
+.pulse-chip{color:#B9E3A8;border-color:rgba(83,252,24,.35)}
+.spinner{width:10px;height:10px;border-radius:50%;border:2px solid rgba(83,252,24,.25);border-top-color:var(--kick-green);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 
 /* ---------- Slot editörü ---------- */
 .slot-editor{

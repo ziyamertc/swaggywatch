@@ -18,6 +18,8 @@ export interface LiveEvent {
 export function useLiveUpdates(handler: (evt: LiveEvent) => void) {
   const connected = ref(false)
   const transport = ref<'ws' | 'sse' | 'none'>('none')
+  // Paylaşılan state: app.vue'daki kepenk (bakım modu) anında haberdar olsun
+  const liveMsg = useState<any>('sb-live-msg', () => null)
 
   onMounted(() => {
     if (typeof window === 'undefined') return
@@ -42,7 +44,10 @@ export function useLiveUpdates(handler: (evt: LiveEvent) => void) {
       ws.onmessage = (e: MessageEvent) => {
         try {
           const data = JSON.parse(e.data)
-          if (data && data.type) handler(data)
+          if (data && data.type) {
+            liveMsg.value = data
+            handler(data)
+          }
         } catch { /* bozuk paket */ }
       }
       ws.onerror = () => {
@@ -70,7 +75,10 @@ export function useLiveUpdates(handler: (evt: LiveEvent) => void) {
       es.onmessage = (e: MessageEvent) => {
         try {
           const data = JSON.parse(e.data)
-          if (data && data.type) handler(data)
+          if (data && data.type) {
+            liveMsg.value = data
+            handler(data)
+          }
         } catch { /* yoksay */ }
       }
       es.onerror = () => { connected.value = false }

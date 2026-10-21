@@ -1,5 +1,5 @@
 import { getPollRaw } from './poll-service.ts'
-import { getQuestion, getSlots, getCredit } from './settings.ts'
+import { getQuestion, getSlots, getCredit, getMaintenance } from './settings.ts'
 import { getStreamStatus } from './kick.ts'
 import { getChannelInfo } from './kick-channel.ts'
 import { dayKeyFor, nextResetIso } from '~/shared/utils/day'
@@ -26,11 +26,12 @@ export interface StatePayload {
 
 export async function buildState(): Promise<StatePayload> {
   const todayKey = dayKeyFor()
-  const [poll, question, slots, credit, stream, channel] = await Promise.all([
+  const [poll, question, slots, credit, maintenance, stream, channel] = await Promise.all([
     getPollRaw(todayKey),
     getQuestion(),
     getSlots(),
     getCredit(),
+    getMaintenance(),
     getStreamStatus(),
     getChannelInfo()
   ])
@@ -55,6 +56,7 @@ export async function buildState(): Promise<StatePayload> {
     question,
     slots,
     credit,
+    maintenance,
     trend,
     live: stream.live,
     streamOk: stream.ok,

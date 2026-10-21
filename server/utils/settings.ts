@@ -152,3 +152,45 @@ export async function setCredit(config: Partial<CreditConfig>): Promise<CreditCo
   await setSetting('credit', JSON.stringify(clean))
   return clean
 }
+
+/* ---------------- Bakım modu (kepenk) ---------------- */
+
+export interface MaintenanceConfig {
+  enabled: boolean
+  message: string
+  startedAt: string | null
+}
+
+export const DEFAULT_MAINTENANCE: MaintenanceConfig = {
+  enabled: false,
+  message: 'Kısa bir mola — birazdan buradayız.',
+  startedAt: null
+}
+
+export async function getMaintenance(): Promise<MaintenanceConfig> {
+  try {
+    const raw = await getSetting('maintenance', '')
+    if (!raw) return { ...DEFAULT_MAINTENANCE }
+    const c = JSON.parse(raw)
+    return {
+      enabled: c.enabled === true,
+      message: String(c.message ?? DEFAULT_MAINTENANCE.message).slice(0, 200),
+      startedAt: c.startedAt ?? null
+    }
+  } catch {
+    return { ...DEFAULT_MAINTENANCE }
+  }
+}
+
+export async function setMaintenance(config: Partial<MaintenanceConfig>): Promise<MaintenanceConfig> {
+  const current = await getMaintenance()
+  const enabled = config.enabled === true
+  const clean: MaintenanceConfig = {
+    enabled,
+    message: String(config.message ?? current.message ?? DEFAULT_MAINTENANCE.message).slice(0, 200),
+    // yeni açılışta başlangıç zamanı damgalanır
+    startedAt: enabled ? (current.enabled ? current.startedAt : new Date().toISOString()) : null
+  }
+  await setSetting('maintenance', JSON.stringify(clean))
+  return clean
+}

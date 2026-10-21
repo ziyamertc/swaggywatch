@@ -1,3 +1,6 @@
 <template>
-  <NuxtPage />
+  <div>
+    <MaintenanceBlind />
+    <NuxtPage />
+  </div>
 </template>

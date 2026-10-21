@@ -359,7 +359,9 @@ const me = ref<{ choice: 'yes' | 'no'; at: number; changeUntil: number; pressUnt
 
 async function loadMe() {
   try {
-    const res: any = await $fetch('/api/poll/me')
+    // ⚠️ x-client-id şart: sunucu oyu cihaz kimliğine göre arıyor
+    await cidEnsure()
+    const res: any = await $fetch('/api/poll/me', { headers: { ...cidHeader.value } })
     me.value = res?.me ?? null
   } catch { me.value = null }
 }
@@ -407,7 +409,7 @@ onBeforeUnmount(() => {
 })
 
 /* ---------------- Cihaz kimliği (CGNAT-safe oy) ---------------- */
-const { header: cidHeader } = useClientId()
+const { header: cidHeader, ensure: cidEnsure } = useClientId()
 
 /* ---------------- Anlık güncelleme (WebSocket + SSE) + uçuşan +1 ---------------- */
 const { floats, push: pushFloat } = useVoteFloats()
@@ -678,6 +680,12 @@ function endReasonText(status: PollStatus) {
 /* ---------------- Oy ---------------- */
 async function vote(choice: 'yes' | 'no') {
   if (!canVote.value) return
+
+  // ⚡ OPTİMİSTİK KİLİTLEME: tıkla → butonlar ANINDA pasifleşir
+  // (sunucu cevabı beklenmeden). Hata olursa eski duruma döner.
+  const prevMe = me.value
+  me.value = { choice, at: Date.now(), changeUntil: 0, pressUntil: Date.now() + 20_000 }
+
   try {
     const res: any = await $fetch<{ ok: boolean; result: string; poll: PollDTO }>('/api/poll/vote', {
       method: 'POST',
@@ -692,6 +700,7 @@ async function vote(choice: 'yes' | 'no') {
     await refreshCur()
     await refreshHist()
   } catch (err: any) {
+    me.value = prevMe            // hata → kilidi geri aç
     const code = String(err?.status ?? err?.statusCode)
     const msg = err?.data?.statusMessage || err?.statusMessage || ''
     if (code === '409' || code === '429') {

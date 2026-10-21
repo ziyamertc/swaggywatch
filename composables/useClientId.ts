@@ -10,23 +10,38 @@ const CID_KEY = 'swaggybark_cid'
 export function useClientId() {
   const clientId = ref('')
 
+  // Kimlik hazır olana kadar bekletilebilmesi için promise
+  let resolveReady!: (v: string) => void
+  const ready = new Promise<string>((res) => { resolveReady = res })
+
+  const generate = () =>
+    (typeof crypto !== 'undefined' && crypto.randomUUID?.()) ||
+    (Date.now().toString(36) + Math.random().toString(36).slice(2))
+
   onMounted(() => {
     let id = ''
     try {
       id = localStorage.getItem(CID_KEY) || ''
       if (!id) {
-        id = (crypto?.randomUUID?.() || (Date.now().toString(36) + Math.random().toString(36).slice(2)))
+        id = generate()
         localStorage.setItem(CID_KEY, id)
       }
     } catch {
-      // localStorage kapalıysa (gizli sekme) → oturum bazlı geçici kimlik
-      id = (crypto?.randomUUID?.() || (Date.now().toString(36) + Math.random().toString(36).slice(2)))
+      // localStorage kapalıysa (gizli sekme) → geçici kimlik
+      id = generate()
     }
     clientId.value = id
+    resolveReady(id)
   })
 
   /** Sunucuya gönderilecek başlık değeri (hazır değilse boş → sunucu IP'ye düşer). */
   const header = computed(() => (clientId.value ? { 'x-client-id': clientId.value } : {}))
 
-  return { clientId, header }
+  /** Kimlik hazır olana kadar bekler (mount sırasından önce çağrılırsa). */
+  const ensure = async () => {
+    if (clientId.value) return clientId.value
+    return await ready
+  }
+
+  return { clientId, header, ensure }
 }
